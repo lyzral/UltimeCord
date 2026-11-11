@@ -10,6 +10,7 @@ export default definePlugin({
     name: "UnifiedStereo",
     description: "Ported from FCord. Stub pending full implementation.",
     authors: [{ name: "FCord", id: 0n }],
+    tags: ["Media", "Voice"],
     patches: [],
     start() {},
     stop() {},

@@ -10,6 +10,7 @@ export default definePlugin({
     name: "SendTrail",
     description: "Ported from FCord. Stub pending full implementation.",
     authors: [{ name: "FCord", id: 0n }],
+    tags: ["Utility"],
     patches: [],
     start() {},
     stop() {},

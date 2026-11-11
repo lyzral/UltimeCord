@@ -10,6 +10,7 @@ export default definePlugin({
     name: "FloeP2PService",
     description: "Ported from FCord. Stub pending full implementation.",
     authors: [{ name: "FCord", id: 0n }],
+    tags: ["Privacy"],
     patches: [],
     start() {},
     stop() {},
