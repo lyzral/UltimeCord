@@ -1,0 +1,162 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ultime Cord promo</title>
+<style>
+    * { box-sizing: border-box; margin: 0; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: #06040d; font-family: "Segoe UI", Arial, sans-serif; color: #fff; }
+    #stage { position: absolute; inset: 0; perspective: 1600px; overflow: hidden; }
+    .grid { position: absolute; inset: -80px; background-image: linear-gradient(rgb(167 139 250 / 5%) 1px, transparent 1px), linear-gradient(90deg, rgb(167 139 250 / 5%) 1px, transparent 1px); background-size: 64px 64px; -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0, transparent 70%); }
+    .glow { position: absolute; width: 1300px; height: 1300px; border-radius: 50%; filter: blur(40px); }
+    #g1 { background: radial-gradient(circle, rgb(124 77 255 / 30%), transparent 62%); }
+    #g2 { background: radial-gradient(circle, rgb(236 72 153 / 13%), transparent 62%); }
+    .abs { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+    .center { left: 50%; top: 50%; }
+
+    .title { width: 1920px; text-align: center; font-family: "Segoe UI Black", "Segoe UI", sans-serif; font-weight: 900; font-size: 104px; letter-spacing: 6px;
+        background: linear-gradient(90deg, #e9d5ff, #a472ff 55%, #f0abfc); -webkit-background-clip: text; color: transparent; filter: drop-shadow(0 0 34px rgb(164 114 255 / 65%)); }
+    .sub { width: 1920px; text-align: center; font-size: 30px; font-weight: 600; letter-spacing: 9px; color: #9d8cff; }
+
+    .card { width: 400px; height: 148px; margin: -74px 0 0 -200px; border-radius: 26px; padding: 26px 28px; display: flex; gap: 22px; align-items: center;
+        background: linear-gradient(145deg, rgb(28 20 48 / 96%), rgb(13 9 24 / 96%)); border: 1.5px solid rgb(var(--c) / 55%);
+        box-shadow: 0 0 60px rgb(var(--c) / 28%), 0 30px 60px rgb(0 0 0 / 55%), inset 0 1px 0 rgb(255 255 255 / 8%); }
+    .tile { flex: none; width: 92px; height: 92px; border-radius: 22px; display: grid; place-items: center; font-family: "Segoe UI Black", sans-serif; font-weight: 900; font-size: 38px;
+        background: linear-gradient(145deg, rgb(var(--c) / 95%), rgb(var(--c) / 45%)); box-shadow: 0 0 30px rgb(var(--c) / 45%); color: #fff; }
+    .card b { display: block; font-family: "Segoe UI Black", sans-serif; font-weight: 900; font-size: 33px; line-height: 1.1; }
+    .card i { display: block; font-style: normal; font-weight: 600; font-size: 20px; color: rgb(var(--c)); margin-top: 4px; }
+    .card u { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; margin-top: 10px; padding: 3px 12px; border-radius: 99px; background: rgb(255 255 255 / 7%); font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: #cfc7e6; }
+    .card u::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--c)); box-shadow: 0 0 8px rgb(var(--c)); }
+
+    #logo { width: 360px; height: 360px; margin: -180px 0 0 -180px; filter: drop-shadow(0 0 70px rgb(124 77 255 / 75%)); }
+    #flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgb(233 213 255 / 95%), rgb(164 114 255 / 45%) 30%, transparent 62%); }
+    #word { width: 1920px; text-align: center; font-family: "Segoe UI", sans-serif; font-weight: 700; font-size: 132px; letter-spacing: -4px; background: linear-gradient(90deg, #fff, #c4a9ff); -webkit-background-clip: text; color: transparent; }
+    #count { width: 1920px; text-align: center; font-family: "Segoe UI Black", sans-serif; font-weight: 900; font-size: 300px; line-height: 1; letter-spacing: -8px;
+        background: linear-gradient(180deg, #fff, #a472ff); -webkit-background-clip: text; color: transparent; filter: drop-shadow(0 0 50px rgb(164 114 255 / 55%)); }
+    .chip { margin: -40px 0 0 -170px; width: 340px; height: 80px; border-radius: 22px; display: flex; align-items: center; gap: 16px; padding: 0 24px; font-size: 26px; font-weight: 700;
+        background: linear-gradient(145deg, rgb(28 20 48 / 96%), rgb(13 9 24 / 96%)); border: 1.5px solid rgb(var(--c) / 50%); box-shadow: 0 0 40px rgb(var(--c) / 22%), 0 20px 40px rgb(0 0 0 / 50%); }
+    .chip::before { content: ""; flex: none; width: 16px; height: 16px; border-radius: 5px; background: rgb(var(--c)); box-shadow: 0 0 14px rgb(var(--c)); }
+    .link { width: 1920px; text-align: center; font-size: 34px; font-weight: 600; color: #cbbcf5; letter-spacing: 1px; }
+    .link span { color: #7f72a8; margin: 0 18px; }
+</style>
+
+<div id="stage">
+    <div class="grid abs" id="grid"></div>
+    <div class="glow abs" id="g1"></div>
+    <div class="glow abs" id="g2"></div>
+
+    <div class="title abs" id="t1">TOO MANY MODS?</div>
+    <div class="sub abs" id="s1">ONE FOR PLUGINS · ONE FOR THEMES · ONE FOR PRIVACY</div>
+    <div class="title abs" id="t2">OR JUST ONE.</div>
+    <div class="sub abs" id="s2">EVERYTHING IN A SINGLE CLIENT</div>
+
+    <div class="card abs center" style="--c: 244 114 182"><div class="tile">Vc</div><div><b>Vencord</b><i>Fast &amp; extensible</i><u>PLUGINS INCLUDED</u></div></div>
+    <div class="card abs center" style="--c: 45 212 191"><div class="tile">Eq</div><div><b>Equicord</b><i>Hundreds of plugins</i><u>PLUGINS INCLUDED</u></div></div>
+    <div class="card abs center" style="--c: 129 140 248"><div class="tile">Nc</div><div><b>Nightcord</b><i>Privacy tools</i><u>PLUGINS INCLUDED</u></div></div>
+    <div class="card abs center" style="--c: 250 204 21"><div class="tile">Th</div><div><b>Themes</b><i>Studio &amp; library</i><u>BUILT IN</u></div></div>
+    <div class="card abs center" style="--c: 248 113 113"><div class="tile">Wd</div><div><b>Widgets</b><i>Profile widget studio</i><u>BUILT IN</u></div></div>
+
+    <div id="flash" class="abs"></div>
+    <svg id="logo" class="abs center" viewBox="0 0 1024 1024">
+        <defs>
+            <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b1a8f"/><stop offset=".55" stop-color="#1d0d4a"/><stop offset="1" stop-color="#0d0620"/></linearGradient>
+            <radialGradient id="halo" cx="50%" cy="34%" r="52%"><stop offset="0" stop-color="#a472ff" stop-opacity=".55"/><stop offset="1" stop-color="#a472ff" stop-opacity="0"/></radialGradient>
+            <linearGradient id="u" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#b9a0ff"/></linearGradient>
+        </defs>
+        <rect width="1024" height="1024" rx="228" fill="url(#tile)"/><rect width="1024" height="1024" rx="228" fill="url(#halo)"/>
+        <rect x="5" y="5" width="1014" height="1014" rx="223" fill="none" stroke="#c9b4ff" stroke-opacity=".3" stroke-width="10"/>
+        <g transform="translate(0 28)">
+            <path id="upath" d="M318 300V560a194 194 0 0 0 388 0V300" fill="none" stroke="url(#u)" stroke-width="124" stroke-linecap="round" pathLength="1"/>
+            <path id="spark" d="M512 212C524 300 552 328 640 340C552 352 524 380 512 468C500 380 472 352 384 340C472 328 500 300 512 212Z" fill="#f5eeff" style="transform-origin: 512px 340px"/>
+        </g>
+    </svg>
+    <div id="word" class="abs">Ultime Cord</div>
+
+    <div id="count" class="abs">0</div>
+    <div class="sub abs" id="s3">PLUGINS, READY TO TOGGLE</div>
+    <div class="chip abs center" style="--c: 164 114 255">Theme studio</div>
+    <div class="chip abs center" style="--c: 45 212 191">Custom Widget</div>
+    <div class="chip abs center" style="--c: 244 114 182">Music player</div>
+    <div class="chip abs center" style="--c: 250 204 21">AutoQuest</div>
+    <div class="chip abs center" style="--c: 129 140 248">Message logger</div>
+    <div class="chip abs center" style="--c: 248 113 113">Privacy tools</div>
+
+    <div class="sub abs" id="s4">DISCORD, MADE YOUR OWN</div>
+    <div class="link abs" id="l1">github.com/lyzral/UltimeCord<span>·</span>discord.gg/khad</div>
+    <div class="link abs" id="l2" style="font-size: 24px; color: #8f84b3; letter-spacing: 6px">WINDOWS · LINUX · ANDROID</div>
+</div>
+
+<script>
+    const DURATION = 21;
+    const PLUGINS = 759;
+    const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+    const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+    const p = (t, a, b) => clamp((t - a) / (b - a));
+    const outCubic = x => 1 - (1 - x) ** 3, inCubic = x => x ** 3, inOut = x => x < .5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2;
+    const outBack = x => 1 + 2.4 * (x - 1) ** 3 + 1.4 * (x - 1) ** 2;
+    const lerp = (a, b, x) => a + (b - a) * x;
+    // visible between a and b, fading over `f` seconds at each end
+    const win = (t, a, b, f = .45) => Math.min(p(t, a, a + f), 1 - p(t, b - f, b));
+    const set = (el, o, tf) => { el.style.opacity = o; el.style.transform = tf; };
+
+    const cards = $$(".card"), chips = $$(".chip");
+    const CARD_POS = [[-560, -90, -5], [-545, 215, 2], [0, 40, -2], [505, -105, 4], [470, 205, -1]];
+    const CHIP_POS = [[-640, 250], [-260, 330], [130, 250], [520, 330], [-450, 410], [330, 410]];
+
+    window.seek = t => {
+        // ---- backdrop
+        $("#g1").style.transform = `translate(${310 + Math.sin(t * .5) * 180}px, ${-110 + Math.cos(t * .4) * 110}px)`;
+        $("#g2").style.transform = `translate(${-200 + Math.cos(t * .35) * 220}px, ${120 + Math.sin(t * .45) * 120}px)`;
+        $("#grid").style.transform = `translate(${-(t * 14) % 64}px, ${-(t * 9) % 64}px)`;
+
+        // ---- scene 1: too many mods (0 - 6.2)
+        const a1 = win(t, .3, 6.0), a2 = win(t, 6.2, 9.4);
+        set($("#t1"), a1, `translateY(${150 - 30 * outCubic(p(t, .3, 1.1))}px)`);
+        set($("#s1"), win(t, .8, 6.0), "translateY(292px)");
+        // ---- scene 2: or just one (6.2 - 9.4)
+        set($("#t2"), a2, `translateY(120px) scale(${lerp(1.25, 1, outCubic(p(t, 6.2, 6.9)))})`);
+        set($("#s2"), win(t, 6.7, 9.4), "translateY(262px)");
+
+        cards.forEach((c, i) => {
+            const [x, y, r] = CARD_POS[i];
+            const inn = outBack(p(t, .9 + i * .28, 1.7 + i * .28));
+            const merge = inCubic(p(t, 7.7 + i * .07, 8.75));
+            const fx = Math.sin(t * .9 + i * 1.7) * 16, fy = Math.cos(t * .75 + i * 2.1) * 14;
+            const k = 1 - merge;
+            const o = Math.min(p(t, .9 + i * .28, 1.4 + i * .28), 1 - p(t, 8.5, 8.8));
+            set(c, o, `translate(${(x + fx) * k}px, ${(y + fy + 60) * k + 40 * (1 - inn)}px) rotateZ(${r * k}deg) rotateY(${(x / 560) * -12 * k + Math.sin(t + i) * 4}deg) rotateX(${Math.cos(t * .8 + i) * 4}deg) scale(${lerp(.6, 1, inn) * lerp(1, .25, merge)})`);
+        });
+
+        // ---- logo: born from the merge (8.7), holds, leaves for the counter, returns for the outro
+        const born = p(t, 8.7, 9.5), away = p(t, 11.6, 12.2), back = p(t, 17.1, 17.9);
+        const logoO = Math.min(p(t, 8.7, 8.9), 1 - away) + back;
+        const outro = inOut(back);
+        const ls = t < 14 ? lerp(.2, 1, outBack(born)) * lerp(1, .6, inCubic(away)) : lerp(.5, .72, outBack(back));
+        const ly = t < 14 ? lerp(40, -60, inOut(p(t, 9.6, 10.3))) : -170;
+        set($("#logo"), clamp(logoO), `translateY(${ly}px) scale(${ls}) rotate(${(1 - outCubic(born)) * -25}deg)`);
+        $("#upath").style.strokeDasharray = `${outCubic(p(t, 8.8, 9.7))} 1`;
+        $("#spark").style.transform = `scale(${outBack(p(t, 9.4, 10)) * (1 + Math.sin(t * 3) * .05)}) rotate(${t * 22}deg)`;
+        $("#flash").style.opacity = Math.max(0, (1 - Math.abs(t - 8.78) / .45)) * .9;
+
+        const w1 = win(t, 10, 11.9, .5), w2 = p(t, 17.5, 18.2);
+        set($("#word"), Math.max(w1, w2), `translateY(${t < 14 ? 690 - 30 * outCubic(p(t, 10, 10.7)) : 560 - 30 * outCubic(w2)}px) scale(${t < 14 ? 1 : .8})`);
+
+        // ---- scene 3: plugin count and features (12.1 - 17.2)
+        const c3 = win(t, 12.1, 17.1);
+        $("#count").textContent = Math.round(PLUGINS * outCubic(p(t, 12.2, 14.2)));
+        set($("#count"), c3, `translateY(${150 - 40 * outCubic(p(t, 12.1, 12.9))}px) scale(${1 + .04 * Math.sin(p(t, 14.2, 14.6) * Math.PI)})`);
+        set($("#s3"), win(t, 12.6, 17.1), "translateY(475px)");
+        chips.forEach((c, i) => {
+            const a = 13.3 + i * .22, e = outBack(p(t, a, a + .6));
+            set(c, Math.min(p(t, a, a + .3), 1 - p(t, 16.7, 17.1)), `translate(${CHIP_POS[i][0] + 60 + Math.sin(t + i * 2) * 8}px, ${CHIP_POS[i][1] - 150 + Math.cos(t * .9 + i) * 7 + 50 * (1 - e)}px) scale(${lerp(.7, 1, e)})`);
+        });
+
+        // ---- outro (17.1 - 21)
+        set($("#s4"), p(t, 18, 18.6), "translateY(735px)");
+        set($("#l1"), p(t, 18.5, 19.1), `translateY(${840 - 20 * outCubic(p(t, 18.5, 19.1))}px)`);
+        set($("#l2"), p(t, 19, 19.6), "translateY(925px)");
+        $("#stage").style.opacity = 1 - p(t, 20.5, 21);
+    };
+
+    // Opened by hand, it just plays
+    if (!navigator.webdriver) { const t0 = performance.now(); (function loop() { seek(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); })(); }
+    else seek(0);
+</script>
