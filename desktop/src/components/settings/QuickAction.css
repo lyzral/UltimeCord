@@ -1,0 +1,43 @@
+.vc-settings-quickActions-card {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 1em;
+}
+
+@media (width <=1040px) {
+    .vc-settings-quickActions-card {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.vc-settings-quickActions-pill {
+    all: unset;
+    cursor: pointer;
+    background: var(--control-secondary-background-default);
+    color: var(--control-secondary-text-default, var(--text-default));
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color var(--ec-motion-fast) ease;
+    box-sizing: border-box;
+}
+
+.vc-settings-quickActions-pill:hover {
+    background: var(--control-secondary-background-hover);
+}
+
+.vc-settings-quickActions-pill:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+}
+
+.vc-settings-quickActions-img {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}

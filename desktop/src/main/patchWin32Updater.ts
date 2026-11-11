@@ -1,0 +1,65 @@
+/*
+ * Ultime Cord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { app } from "electron";
+import { existsSync, mkdirSync, readdirSync, renameSync, statSync, writeFileSync } from "original-fs";
+import { basename, dirname, join } from "path";
+
+function isNewer($new: string, old: string) {
+    const newParts = $new.slice(4).split(".").map(Number);
+    const oldParts = old.slice(4).split(".").map(Number);
+
+    for (let i = 0; i < oldParts.length; i++) {
+        if (newParts[i] > oldParts[i]) return true;
+        if (newParts[i] < oldParts[i]) return false;
+    }
+    return false;
+}
+
+function patchLatest() {
+    if (process.env.DISABLE_UPDATER_AUTO_PATCHING) return;
+
+    try {
+        const currentAppPath = dirname(process.execPath);
+        const currentVersion = basename(currentAppPath);
+        const discordPath = join(currentAppPath, "..");
+
+        const latestVersion = readdirSync(discordPath).reduce((prev, curr) => {
+            return (curr.startsWith("app-") && isNewer(curr, prev))
+                ? curr
+                : prev;
+        }, currentVersion);
+
+        if (latestVersion === currentVersion) return;
+
+        const resources = join(discordPath, latestVersion, "resources");
+        const origAsar = join(resources, "app.asar");
+        const backupAsar = join(resources, "_app.asar");
+        const appDir = join(resources, "app");
+
+        if (!existsSync(origAsar) || statSync(origAsar).isDirectory()) return;
+
+        console.info("[Ultime Cord] Detected Host Update. Repatching...");
+
+        renameSync(origAsar, backupAsar);
+        if (existsSync(appDir)) {
+            // Directory exists
+        } else {
+            mkdirSync(appDir);
+        }
+        writeFileSync(join(appDir, "package.json"), JSON.stringify({
+            name: "discord",
+            main: "index.js"
+        }));
+        writeFileSync(join(appDir, "index.js"), `require(${JSON.stringify(join(__dirname, "patcher.js"))});`);
+    } catch (err) {
+        console.error("[Ultime Cord] Failed to repatch latest host update", err);
+    }
+}
+
+// Try to patch latest on before-quit
+// Discord's Win32 updater will call app.quit() on restart and open new version on will-quit
+app.on("before-quit", patchLatest);

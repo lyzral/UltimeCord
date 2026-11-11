@@ -1,0 +1,7 @@
+/*
+ * Discord adds body { app-region: drag } while it loads, and a theme that delays the load can leave it there for good.
+ * unset rather than no-drag: this property is inherited, and an inherited no-drag erases the title bar's drag area.
+ */
+body {
+    app-region: unset;
+}

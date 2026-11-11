@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+   What cloud backup and device-to-device transfer (API 31+) leave out: the key that signs the patched Discord, and
+   the preferences, which carry the install token and the newest signed release taken. Both are this phone's own.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="ks.keystore"/>
+        <exclude domain="sharedpref" path="prefs.xml"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="ks.keystore"/>
+        <exclude domain="sharedpref" path="prefs.xml"/>
+    </device-transfer>
+</data-extraction-rules>

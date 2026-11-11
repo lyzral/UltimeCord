@@ -1,0 +1,16 @@
+/*
+ * Always-on layout containment for long lists: a change inside one row no longer makes the browser
+ * lay out the rest of the list. Nothing here forces GPU layers or changes how text is drawn.
+ */
+
+li[id^="chat-messages-"] {
+    contain: layout style;
+}
+
+div[data-list-item-id^="members-"] {
+    contain: layout style;
+}
+
+div[data-list-item-id^="channels___"] {
+    contain: layout style;
+}

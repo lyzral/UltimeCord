@@ -1,0 +1,145 @@
+/*
+ * Ultime Cord, a Discord client mod
+ * Copyright (c) 2023 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import ErrorBoundary from "@components/ErrorBoundary";
+import { Link } from "@components/Link";
+import { Notice } from "@components/Notice";
+import { RenderModalProps } from "@endcord/discord-types";
+import { GUILD_ID, INVITE_KEY, RAW_SKU_ID } from "@plugins/decor/lib/constants";
+import { useCurrentUserDecorationsStore } from "@plugins/decor/lib/stores/CurrentUserDecorationsStore";
+import { cl, DecorationModalClasses, requireAvatarDecorationModal, requireCreateStickerModal } from "@plugins/decor/ui";
+import { AvatarDecorationModalPreview } from "@plugins/decor/ui/components";
+import { openInviteModal } from "@utils/discord";
+import { t } from "@utils/i18n";
+import { Margins } from "@utils/margins";
+import { findComponentByCodeLazy } from "@webpack";
+import { closeAllModals, FluxDispatcher, Forms, GuildStore, Modal, NavigationRouter, openModal, Text, TextInput, useEffect, useMemo, UserStore, useState } from "@webpack/common";
+
+const FileUpload = findComponentByCodeLazy(".currentTarget.files", "lineClamp:1");
+
+function useObjectURL(object: Blob | MediaSource | null) {
+    const [url, setUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!object) return;
+
+        const objectUrl = URL.createObjectURL(object);
+        setUrl(objectUrl);
+
+        return () => {
+            URL.revokeObjectURL(objectUrl);
+            setUrl(null);
+        };
+    }, [object]);
+
+    return url;
+}
+
+function CreateDecorationModal(props: RenderModalProps) {
+    const [name, setName] = useState("");
+    const [file, setFile] = useState<File | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        if (error) setError(null);
+    }, [file]);
+
+    const { create: createDecoration } = useCurrentUserDecorationsStore();
+
+    const fileUrl = useObjectURL(file);
+
+    const decoration = useMemo(() => fileUrl ? { asset: fileUrl, skuId: RAW_SKU_ID } : null, [fileUrl]);
+
+    return <Modal
+        {...props}
+        size="lg"
+        title={t("Create Decoration")}
+        actions={[
+            {
+                text: "Cancel",
+                variant: "secondary",
+                onClick: props.onClose
+            },
+            {
+                text: "Submit for Review",
+                variant: "primary",
+                onClick: () => {
+                    setSubmitting(true);
+                    createDecoration({ alt: name, file: file! })
+                        .then(props.onClose).catch(e => { setSubmitting(false); setError(e); });
+                },
+                disabled: !file || !name || submitting
+            }
+        ]}
+    >
+        <div className={cl("create-decoration-modal-content", DecorationModalClasses.modal)}>
+            <ErrorBoundary>
+                <Notice.Warning>
+                    {t("Make sure your decoration does not violate")}{" "}<Link
+                        href="https://github.com/decor-discord/.github/blob/main/GUIDELINES.md"
+                    >
+                        {t("the guidelines")}</Link>{" "}{t("before submitting it.")}</Notice.Warning>
+                <div className={cl("create-decoration-modal-form-preview-container")}>
+                    <div className={cl("create-decoration-modal-form")}>
+                        {error !== null && <Text color="text-danger" variant="text-xs/normal">{error.message}</Text>}
+                        <section>
+                            <Forms.FormTitle tag="h5">{t("File")}</Forms.FormTitle>
+                            <FileUpload
+                                filename={file?.name}
+                                placeholder={t("Choose a file")}
+                                buttonText={t("Browse")}
+                                filters={[{ name: "Decoration file", extensions: ["png", "apng"] }]}
+                                onFileSelect={setFile}
+                            />
+                            <Forms.FormText className={Margins.top8}>
+                                {t("File should be APNG or PNG.")}</Forms.FormText>
+                        </section>
+                        <section>
+                            <Forms.FormTitle tag="h5">{t("Name")}</Forms.FormTitle>
+                            <TextInput
+                                placeholder={t("Companion Cube")}
+                                value={name}
+                                onChange={setName}
+                            />
+                            <Forms.FormText className={Margins.top8}>
+                                {t("This name will be used when referring to this decoration.")}</Forms.FormText>
+                        </section>
+                    </div>
+                    <div>
+                        <AvatarDecorationModalPreview
+                            avatarDecoration={decoration}
+                            user={UserStore.getCurrentUser()}
+                        />
+                    </div>
+                </div>
+                <Notice.Info className={Margins.bottom8}>
+                    {t("To receive updates on your decoration's review, join")}{" "}<Link
+                        href={`https://discord.gg/${INVITE_KEY}`}
+                        onClick={async e => {
+                            e.preventDefault();
+                            if (!GuildStore.getGuild(GUILD_ID)) {
+                                const inviteAccepted = await openInviteModal(INVITE_KEY);
+                                if (inviteAccepted) {
+                                    closeAllModals();
+                                    FluxDispatcher.dispatch({ type: "LAYER_POP_ALL" });
+                                }
+                            } else {
+                                closeAllModals();
+                                FluxDispatcher.dispatch({ type: "LAYER_POP_ALL" });
+                                NavigationRouter.transitionToGuild(GUILD_ID);
+                            }
+                        }}
+                    >
+                        {t("Decor's Discord server")}</Link>{" "}{t("and allow direct messages.")}</Notice.Info>
+            </ErrorBoundary>
+        </div>
+    </Modal>;
+}
+
+export const openCreateDecorationModal = () =>
+    Promise.all([requireAvatarDecorationModal(), requireCreateStickerModal()])
+        .then(() => openModal(props => <CreateDecorationModal {...props} />));

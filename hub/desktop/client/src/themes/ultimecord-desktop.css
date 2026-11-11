@@ -1,0 +1,43 @@
+/**
+ * @name Ultime Cord Desktop
+ * @description Dark Ultime Cord desktop theme with a blue accent and readable Discord-native panels.
+ * @author Xohus
+ * @version 0.1.0
+ */
+
+:root {
+    --ultimecord-accent: #3f8cff;
+    --ultimecord-accent-soft: rgba(63, 140, 255, 0.22);
+    --ultimecord-panel: rgba(24, 27, 32, 0.92);
+    --ultimecord-panel-alt: rgba(35, 39, 47, 0.94);
+}
+
+.theme-dark {
+    --brand-500: var(--ultimecord-accent);
+    --brand-560: #2f73d4;
+    --button-positive-background: var(--ultimecord-accent);
+    --background-primary: #15171c;
+    --background-secondary: #1b1f27;
+    --background-secondary-alt: #202631;
+    --background-tertiary: #101218;
+}
+
+.theme-dark .vc-settings-tab,
+.theme-dark [class*="sidebarRegionScroller"],
+.theme-dark [class*="contentRegionScroller"] {
+    background: transparent;
+}
+
+.theme-dark .vc-addon-card,
+.theme-dark .vc-special-card,
+.theme-dark [class*="cardPrimary"] {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: var(--ultimecord-panel);
+}
+
+.theme-dark .vc-addon-card:hover,
+.theme-dark .vc-special-card:hover {
+    border-color: var(--ultimecord-accent-soft);
+    background: var(--ultimecord-panel-alt);
+}

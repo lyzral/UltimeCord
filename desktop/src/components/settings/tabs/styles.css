@@ -1,0 +1,81 @@
+.vc-settings-tab {
+    position: relative;
+    isolation: isolate;
+    box-sizing: border-box;
+    padding: 24px;
+    border-radius: var(--ec-radius-lg);
+    background: var(--ec-line);
+    clip-path: var(--ec-pc4);
+
+    /* A quick fade with a slight lift. Scaling the whole page blurred its text while it moved */
+    animation: ec-tab-in calc(var(--ec-motion-base) * 0.75) var(--ec-ease-out);
+}
+
+@keyframes ec-tab-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+.vc-settings-tab::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    z-index: -1;
+    border-radius: max(0px, var(--ec-radius-lg) - 1px);
+    background: var(--ec-night);
+    clip-path: var(--ec-pc4);
+}
+
+/* The installer's dot grid, only behind the top of the page, in pixel style */
+[data-ec-pixel] .vc-settings-tab::after {
+    content: "";
+    position: absolute;
+    inset: 1px 1px auto;
+    z-index: -1;
+    height: 420px;
+    background-image: var(--ec-dots);
+    background-size: 24px 24px;
+    mask-image: radial-gradient(ellipse 75% 70% at 50% 0%, #000 25%, transparent 80%);
+    pointer-events: none;
+}
+
+.vc-settings-tab-bar {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.vc-settings-tab-bar-item {
+    margin-right: 32px;
+    padding-bottom: 16px;
+    margin-bottom: -2px;
+}
+
+.vc-settings-donate {
+    display: flex;
+    flex-direction: row;
+}
+
+.vc-cloud-settings-sync-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1em;
+    margin-top: 16px;
+}
+
+.vc-cloud-erase-data-danger-btn {
+    color: var(--control-critical-primary-text-default);
+    background-color: var(--control-critical-primary-background-default);
+}
+
+.vc-cloud-icon-with-button {
+    display: flex;
+    gap: 0.5em;
+    padding-inline: 0.5em 1em;
+}
+
+.vc-cloud-button-icon {
+    height: 1.25em;
+}

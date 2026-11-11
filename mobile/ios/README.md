@@ -1,0 +1,56 @@
+# Ultime Cord for iOS
+
+The tweak that loads Ultime Cord into Discord on iPhone and iPad: the same bundle as on Android
+(`../bundle`), which it downloads from the `builds-next` branch. It needs Discord 332 or newer, where React Native
+runs bridgeless; the tweak starts the bundle from `RCTHost`'s `instance:didInitializeRuntime:` through JSI.
+
+Based on [RainTweak](https://codeberg.org/raincord/RainTweak) (OSL-3.0); see `../UPSTREAM.md`.
+
+## Builds
+
+The iOS workflow (`.github/workflows/ios.yml`) builds it on macOS with [Theos](https://theos.dev):
+
+- `com.endcord.tweak_<version>_iphoneos-arm64.deb` for jailbroken devices (rootless)
+- `Ultime Cord.dylib` to inject into a Discord IPA with Feather, ESign, KSign or Sideloadly
+- `Ultime Cord.ipa`, Discord with the tweak injected, from the decrypted Discord IPA linked in the `DISCORD_IPA_URL`
+  secret, or else RainTweak's public IPA, pinned by hash, with RainTweak taken out of it (`scripts/remove-dylib.cjs`)
+
+On `next` they're published as the `ios-v<version>` release, whose files each new Discord replaces, and
+`builds-ios/apps.json` is the source AltStore and SideStore install and update Ultime Cord from:
+`https://raw.githubusercontent.com/Endcord/endcord-mobile/builds-ios/apps.json`. For a new Discord, change the secret
+and re-run the latest iOS run on `next`.
+
+Shake the device for the recovery menu (safe mode, a custom bundle URL, deleting plugins or themes). Ultime Cord's files
+are in the Files app too with `Ultime Cord.ipa` (On My iPhone → Ultime Cord: `pyoncord`, and its settings in `vd_mmkv`).
+
+## Tests
+
+The workflow's simulator job (`Tests/run.sh`) builds the tweak for the iOS simulator and loads it into `Tests/Host.mm`,
+a stand-in for Discord with the Hermes runtime Discord ships (bytecode 98 and 99), which downloads its bundle from
+`Tests/server.py`. Each scenario is one launch: the first start, the cache and its ETag, updates, the plain bundle
+when there's no bytecode one, bytecode for another Hermes, offline starts, custom URLs, broken files, themes, fonts,
+a bundle that throws, the published bundle, the recovery menu, safe mode, SmoothType's caret and the app group. The
+release is only published when it passes.
+
+Pushing to an `ios-real/` branch runs the real iOS Discord on the simulator (`Tests/real-discord.sh`, the `iOS real
+Discord` workflow): a decrypted device build runs on an Apple silicon simulator once its binaries are retagged for it,
+so the bundle's self-test starts and stops every plugin inside Discord itself, logged out, and screenshots Ultime Cord's
+pages. Nothing from it is published.
+
+## Bundle signing
+
+CI signs every published bundle (`bundle/scripts/sign-release.mjs`, the `ENDCORD_RELEASE_KEY` secret), and the tweak
+and the Android loader are built with its public key, `bundle/release-key.pub`. They take a bundle only when its size
+and SHA-256 are in a release with a valid signature, refuse a release older than one they've accepted, and check the
+saved bundle again on each start. The release names the commit's own address of each bundle, which the CDN can't answer
+with an older build, so a manifest and its bundles always match right after a deploy. The key isn't on the server, so
+changing the files there isn't enough to run code in anyone's Discord. Builds are strict, refusing unsigned bundles too,
+once the secret is set. A custom URL is the user's own choice and isn't checked.
+
+## What sideloading can't do
+
+These hold for every modded Discord installed with a sideloading app:
+
+- Notifications don't arrive while Discord is closed or in the background
+- Passkeys and sharing to Discord from other apps don't work
+- Changing the app icon only works when the bundle ID matches the provisioning profile's App ID

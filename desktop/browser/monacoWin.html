@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'none'; script-src 'unsafe-inline' chrome-extension: moz-extension: blob:; style-src 'unsafe-inline' chrome-extension: moz-extension:; font-src data: chrome-extension: moz-extension:; img-src data:; worker-src blob: chrome-extension: moz-extension:; connect-src chrome-extension: moz-extension:"
+        />
+        <title>Endcord QuickCSS Editor</title>
+        <style>
+            html,
+            body,
+            #container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="container"></div>
+
+        <script>
+            const script = document.createElement("script");
+            script.src = new URL("/vendor/monaco/index.js", baseUrl);
+
+            const style = document.createElement("link");
+            style.type = "text/css";
+            style.rel = "stylesheet";
+            style.href = new URL("/vendor/monaco/index.css", baseUrl);
+
+            document.body.append(style, script);
+        </script>
+    </body>
+</html>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+   What Android's backup (devices before API 31) leaves out: the key that signs the patched Discord, and the
+   preferences, which carry the install token and the newest signed release taken. Both are this phone's own.
+   A restore on another phone makes a fresh key, so the patched Discord is installed again rather than updated.
+-->
+<full-backup-content>
+    <exclude domain="file" path="ks.keystore"/>
+    <exclude domain="sharedpref" path="prefs.xml"/>
+</full-backup-content>

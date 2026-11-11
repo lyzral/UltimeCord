@@ -1,0 +1,384 @@
+/*
+ * Ultime Cord, a Discord client mod
+ * Copyright (c) 2023 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { popNotice, showNotice } from "@api/Notices";
+import { showNotification } from "@api/Notifications";
+import { isPluginEnabled } from "@api/PluginManager";
+import { definePluginSettings, Settings } from "@api/Settings";
+import { getUserSettingLazy } from "@api/UserSettings";
+import { Card } from "@components/Card";
+import ErrorBoundary from "@components/ErrorBoundary";
+import { Flex } from "@components/Flex";
+import { openSettingsTabModal, UpdaterTab } from "@components/settings";
+import { Channel, RenderModalProps } from "@endcord/discord-types";
+import { Devs, ENDCORD_GUILD_ID, SUPPORT_CHANNEL_ID } from "@utils/constants";
+import { openInviteModal, sendMessage } from "@utils/discord";
+import { t } from "@utils/i18n";
+import { Logger } from "@utils/Logger";
+import { Margins } from "@utils/margins";
+import { isPluginDev, tryOrElse } from "@utils/misc";
+import { openModal } from "@utils/modal";
+import { relaunch } from "@utils/native";
+import { makeCodeblock } from "@utils/text";
+import definePlugin from "@utils/types";
+import { checkForUpdates, update } from "@utils/updater";
+import { Button, ChannelStore, ConfirmModal, Forms, GuildStore, Parser, PermissionsBits, PermissionStore, RelationshipStore, showToast, Toasts, UserStore } from "@webpack/common";
+import { JSX } from "react";
+
+import gitHash from "~git-hash";
+import plugins, { PluginMeta } from "~plugins";
+
+import SettingsPlugin from "./settings";
+const CodeBlockRe = /```js\n(.+?)```/s;
+
+const AsyncFunction = async function () { }.constructor;
+
+const ShowCurrentGame = getUserSettingLazy<boolean>("status", "showCurrentGame")!;
+
+const isSupportAllowedChannel = (channel: Channel) => channel.id === SUPPORT_CHANNEL_ID;
+
+// Yetkili Owner Hesapları: the accounts that may tell every client to check for an update
+const ENDCORD_OWNER_IDS = ["1390609041897554050", "1097880625513496586", "904384828143706164"];
+
+// These messages get an update button and a button that runs code in everyone's client, so only Endcord's owners,
+// in Endcord's own server. A plugin developer's stolen account must not be enough
+const isEndcordStaffMessage = ({ channel, message }: Record<string, any>) => channel.guild_id === ENDCORD_GUILD_ID && ENDCORD_OWNER_IDS.includes(message.author?.id);
+
+async function forceUpdate() {
+    const outdated = await checkForUpdates();
+    if (outdated) {
+        await update();
+        relaunch();
+    }
+
+    return outdated;
+}
+
+async function generateDebugInfoMessage() {
+    const { RELEASE_CHANNEL } = window.GLOBAL_ENV;
+
+    const client = (() => {
+        if (IS_DISCORD_DESKTOP) return `Discord Desktop v${DiscordNative.app.getVersion()}`;
+        if (IS_VESKTOP) return `Ultime Cord Desktop v${VesktopNative.app.getVersion()}`;
+        if ("legcord" in window) return `Legcord v${window.legcord.version}`;
+
+        // @ts-expect-error
+        const name = typeof unsafeWindow !== "undefined" ? "UserScript" : "Web";
+        return `${name} (${navigator.userAgent})`;
+    })();
+
+    const info = {
+        "Ultime Cord":
+            `v${VERSION} • [${gitHash}](<https://github.com/lyzral/commit/${gitHash}>)` +
+            `${SettingsPlugin.additionalInfo} - ${Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(BUILD_TIMESTAMP)}`,
+        Client: `${RELEASE_CHANNEL} ~ ${client}`,
+        Platform: navigator.platform
+    };
+
+    if (IS_DISCORD_DESKTOP) {
+        info["Last Crash Reason"] = (await tryOrElse(() => DiscordNative.processUtils.getLastCrash(), undefined))?.rendererCrashReason ?? "N/A";
+    }
+
+    const commonIssues = {
+        "Activity Sharing disabled": tryOrElse(() => !ShowCurrentGame.getSetting(), false),
+        "Ultime Cord DevBuild": !IS_STANDALONE,
+        "Has UserPlugins": Object.values(PluginMeta).some(m => m.userPlugin),
+        "More than two weeks out of date": BUILD_TIMESTAMP < Date.now() - 12096e5,
+    };
+
+    let content = `>>> ${Object.entries(info).map(([k, v]) => `**${k}**: ${v}`).join("\n")}`;
+    content += `\n${Object.entries(commonIssues)
+        .filter(([, v]) => v).map(([k]) => `⚠️ ${k}`)
+        .join("\n")}`;
+
+    return content.trim();
+}
+
+function generatePluginList() {
+    const isApiPlugin = (plugin: string) => plugin.endsWith("API") || plugins[plugin].required;
+
+    const enabledPlugins = Object.keys(plugins)
+        .filter(p => isPluginEnabled(p) && !isApiPlugin(p));
+
+    const enabledStockPlugins = enabledPlugins.filter(p => !PluginMeta[p].userPlugin);
+    const enabledUserPlugins = enabledPlugins.filter(p => PluginMeta[p].userPlugin);
+
+    let content = `**Enabled Plugins (${enabledStockPlugins.length}):**\n${makeCodeblock(enabledStockPlugins.join(", "))}`;
+
+    if (enabledUserPlugins.length) {
+        content += `**Enabled UserPlugins (${enabledUserPlugins.length}):**\n${makeCodeblock(enabledUserPlugins.join(", "))}`;
+    }
+
+    return content;
+}
+
+const settings = definePluginSettings({}).withPrivateSettings<{
+    dismissedDevBuildWarning?: boolean;
+    dismissedDonateWarning?: boolean;
+    invitePromptShown?: boolean;
+    firstSeenAt?: number;
+    starPromptShown?: boolean;
+    devtoolsWarningRestored?: boolean;
+}>();
+
+// Vanity invite, it doesn't expire
+const ENDCORD_INVITE_CODE = "khad";
+const REPO_URL = "https://github.com/lyzral";
+const STAR_PROMPT_DELAY = 7 * 24 * 60 * 60 * 1000;
+const UPDATE_COMMAND_COOLDOWN = 10 * 60 * 1000;
+
+let lastUpdateCommand = 0;
+
+// Asks once whether to join the Endcord server. Discord's own invite dialog does the joining, so nothing happens without a click
+async function promptServerInvite() {
+    if (settings.store.invitePromptShown) return;
+    settings.store.invitePromptShown = true;
+    if (!ENDCORD_GUILD_ID || !ENDCORD_INVITE_CODE || GuildStore.getGuild(ENDCORD_GUILD_ID)) return;
+
+    try {
+        await openInviteModal(ENDCORD_INVITE_CODE, ENDCORD_GUILD_ID);
+    } catch (e) {
+        // Most likely offline; ask again on the next connection
+        settings.store.invitePromptShown = false;
+        new Logger("SupportHelper").error("Couldn't open the Ultime Cord server invite", e);
+    }
+}
+
+// Asks for a GitHub star once, after Endcord has been in use for a week
+function promptStar() {
+    const s = settings.store;
+    if (s.starPromptShown) return;
+    s.firstSeenAt ??= Date.now();
+    if (Date.now() - s.firstSeenAt < STAR_PROMPT_DELAY) return;
+
+    s.starPromptShown = true;
+    showNotice(t("Enjoying Ultime Cord? A star on GitHub helps more people find it."), t("Star on GitHub"), () => {
+        popNotice();
+        EndcordNative.native.openExternal(REPO_URL);
+    });
+}
+
+function RunSnippetModal({ code, onConfirm, ...props }: RenderModalProps & { code: string; onConfirm(): void; }) {
+    return (
+        <ConfirmModal
+            {...props}
+            title={t("Run this code?")}
+            confirmText={t("Run Snippet")}
+            cancelText={t("Cancel")}
+            variant="primary"
+            onConfirm={onConfirm}
+        >
+            <Forms.FormText>{t("This code runs inside your Discord with full access to your account. Only continue if you understand what it does.")}</Forms.FormText>
+            {Parser.parse(makeCodeblock(code, "js"))}
+        </ConfirmModal>
+    );
+}
+
+export default definePlugin({
+    name: "SupportHelper",
+    required: true,
+    description: t("Helps us provide support to you"),
+    authors: [Devs.Ven],
+    dependencies: ["UserSettingsAPI"],
+
+    settings,
+
+    start() {
+        // NoDevtoolsWarning used to be forced on, which left it enabled in everyone's saved settings
+        if (settings.store.devtoolsWarningRestored) return;
+        settings.store.devtoolsWarningRestored = true;
+        Settings.plugins.NoDevtoolsWarning.enabled = false;
+    },
+
+    patches: [{
+        find: "#{intl::BEGINNING_DM}",
+        replacement: {
+            match: /#{intl::BEGINNING_DM},{.+?}\),(?=.{0,300}(\i)\.isMultiUserDM)/,
+            replace: "$& $self.renderContributorDmWarningCard({ channel: $1 }),"
+        }
+    }],
+
+    commands: [
+        {
+            name: "ultimecord-debug",
+            description: t("Send Ultime Cord debug info"),
+            predicate: ctx => isPluginDev(UserStore.getCurrentUser()?.id) || isSupportAllowedChannel(ctx.channel),
+            execute: async () => ({ content: await generateDebugInfoMessage() })
+        },
+        {
+            name: "ultimecord-plugins",
+            description: t("Send Ultime Cord plugin list"),
+            predicate: ctx => isPluginDev(UserStore.getCurrentUser()?.id) || isSupportAllowedChannel(ctx.channel),
+            execute: () => ({ content: generatePluginList() })
+        }
+    ],
+
+    flux: {
+        CONNECTION_OPEN() {
+            // Give Discord a moment to finish loading before showing anything
+            setTimeout(() => {
+                promptServerInvite();
+                promptStar();
+            }, 5000);
+        },
+
+        async MESSAGE_CREATE({ guildId, message }) {
+            if (guildId !== ENDCORD_GUILD_ID || !message || !message.content) return;
+
+            if (ENDCORD_OWNER_IDS.includes(message.author?.id) && message.content.trim() === ".endcord-update") {
+                // Every client answers this message, so repeating it must not turn them into a flood of requests
+                if (IS_UPDATER_DISABLED || Date.now() - lastUpdateCommand < UPDATE_COMMAND_COOLDOWN) return;
+                lastUpdateCommand = Date.now();
+
+                try {
+                    if (!await checkForUpdates()) return;
+
+                    // A stolen owner account must not be able to restart everyone, so this only makes clients
+                    // check sooner: installing and restarting stay with the user, as with the regular update check
+                    if (!Settings.autoUpdate) {
+                        showNotification({
+                            title: t("An Ultime Cord update is available!"),
+                            body: t("Click here to view the update"),
+                            onClick: () => openSettingsTabModal(UpdaterTab!)
+                        });
+                        return;
+                    }
+
+                    await update();
+                    showNotification({
+                        title: t("Ultime Cord has been updated!"),
+                        body: t("Click here to restart"),
+                        onClick: relaunch
+                    });
+                } catch { }
+            }
+        }
+    },
+
+    renderMessageAccessory(props) {
+        const buttons = [] as JSX.Element[];
+
+        const shouldAddUpdateButton =
+            !IS_UPDATER_DISABLED
+            && isEndcordStaffMessage(props)
+            && props.message.content?.toLowerCase().includes("update");
+
+        if (shouldAddUpdateButton) {
+            buttons.push(
+                <Button
+                    key="vc-update"
+                    color={Button.Colors.GREEN}
+                    onClick={async () => {
+                        try {
+                            if (await forceUpdate())
+                                showToast(t("Success! Restarting..."), Toasts.Type.SUCCESS);
+                            else
+                                showToast(t("Already up to date!"), Toasts.Type.MESSAGE);
+                        } catch (e) {
+                            new Logger(this.name).error("Error while updating:", e);
+                            showToast(t("Failed to update :("), Toasts.Type.FAILURE);
+                        }
+                    }}
+                >
+                    {t("Update Now")}
+                </Button>
+            );
+        }
+
+        if (props.channel.id === SUPPORT_CHANNEL_ID && PermissionStore.can(PermissionsBits.SEND_MESSAGES, props.channel)) {
+            if (props.message.content.includes("/endcord-debug") || props.message.content.includes("/endcord-plugins")) {
+                buttons.push(
+                    <Button
+                        key="vc-dbg"
+                        color={Button.Colors.PRIMARY}
+                        onClick={async () => sendMessage(props.channel.id, { content: await generateDebugInfoMessage() })}
+                    >
+                        {t("Run /endcord-debug")}
+                    </Button>,
+                    <Button
+                        key="vc-plg-list"
+                        color={Button.Colors.PRIMARY}
+                        onClick={async () => sendMessage(props.channel.id, { content: generatePluginList() })}
+                    >
+                        {t("Run /endcord-plugins")}
+                    </Button>
+                );
+            }
+        }
+
+        if (isEndcordStaffMessage(props)) {
+            const match = CodeBlockRe.exec(props.message.content ?? "");
+            if (match) {
+                buttons.push(
+                    <Button
+                        key="vc-run-snippet"
+                        onClick={() => openModal(modalProps => (
+                            <RunSnippetModal
+                                {...modalProps}
+                                code={match[1]}
+                                onConfirm={async () => {
+                                    try {
+                                        await AsyncFunction(match[1])();
+                                        showToast("Success!", Toasts.Type.SUCCESS);
+                                    } catch (e) {
+                                        new Logger(this.name).error("Error while running snippet:", e);
+                                        showToast(t("Failed to run snippet :("), Toasts.Type.FAILURE);
+                                    }
+                                }}
+                            />
+                        ))}
+                    >
+                        {t("Run Snippet")}
+                    </Button>
+                );
+            }
+        }
+
+        return buttons.length
+            ? <Flex>{buttons}</Flex>
+            : null;
+    },
+
+    renderContributorDmWarningCard: ErrorBoundary.wrap(({ channel }) => {
+        const userId = channel.getRecipientId();
+        if (!isPluginDev(userId)) return null;
+        if (RelationshipStore.isFriend(userId) || isPluginDev(UserStore.getCurrentUser()?.id)) return null;
+
+        return (
+            <Card variant="warning" className={Margins.top8} defaultPadding>
+                {t("Please do not private message Ultime Cord plugin developers for support!")}
+                <br />
+                {t("Instead, use the Ultime Cord support channel:")}{" "}{Parser.parse(`https://discord.com/channels/${ENDCORD_GUILD_ID}/${SUPPORT_CHANNEL_ID}`)}
+                {!ChannelStore.getChannel(SUPPORT_CHANNEL_ID) && " (Click the link to join)"}
+            </Card>
+        );
+    }, { noop: true }),
+});
+
+interface ClientData {
+    name: string;
+    version: string;
+    dev?: boolean;
+    hash?: string | null;
+    shortHash?: string | null;
+}
+
+export function detectClient(): ClientData {
+    if (typeof DiscordNative !== "undefined" && DiscordNative?.app?.getVersion) {
+        return { name: t("Discord Desktop"), version: DiscordNative.app.getVersion() };
+    }
+    if (IS_VESKTOP && VesktopNative?.app?.getVersion) {
+        const hash = tryOrElse(() => VesktopNative.app.getGitHash?.() ?? null, null);
+        return {
+            name: "Ultime Cord Desktop",
+            version: VesktopNative.app.getVersion(),
+            dev: tryOrElse(() => VesktopNative.app.isDevBuild?.() ?? false, false),
+            hash,
+            shortHash: hash?.slice(0, 7) ?? null
+        };
+    }
+    return { name: "Web", version: "1.0.0" };
+}

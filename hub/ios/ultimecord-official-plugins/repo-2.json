@@ -1,0 +1,10 @@
+{
+  "$meta": {
+    "name": "Ultime Cord Official Plugins",
+    "description": "Starter plugin source for UltimeCord."
+  },
+  "fakeprofile": {
+    "version": "1.0.0",
+    "alwaysFetch": true
+  }
+}

@@ -1,0 +1,121 @@
+name: Emulator test
+
+# Installs Endcord through the installer on an Android emulator, like a user would, and runs the bundle's self-test
+# inside the latest Discord. Results (screenshots, logs, the self-test report) are published to test-results/<branch>.
+on:
+  push:
+    branches: ["ci/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  emulator:
+    name: Emulator (API ${{ matrix.api }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        # Android 14 on every push; Android 11, 14 and 15 when run by hand
+        api: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '[30, 34, 35]' || '[34]') }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+      - name: Build the bundle with the self-test
+        working-directory: bundle
+        run: |
+          bun install --frozen-lockfile
+          bun run build --build-minify --test
+          # Precompiled like the published builds, so the emulator runs the bytecode users get
+          node scripts/hermes.mjs
+          mkdir -p ../serve && cp dist/endcord.min.js dist/endcord.v*.hbc ../serve/
+          # A key of this run's own, which the loader and the installer below require, as a release build does
+          openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out ../release-test.pem
+          openssl pkey -in ../release-test.pem -pubout -outform DER | base64 -w0 > ../release-test.pub
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - name: Build the loader
+        working-directory: android/loader
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug -Pendcord.bundleUrl=http://10.0.2.2:4040/endcord.min.js \
+            -Pendcord.releaseKey="$(cat ../../release-test.pub)" -Pendcord.requireSigned=true
+          cp app/build/outputs/apk/debug/app-debug.apk ../../serve/endcord-xposed.apk
+
+      - name: Sign the build
+        # The bundle and the loader together, as the Build workflow signs them: the installer only patches in a loader
+        # the signed release lists
+        run: |
+          ENDCORD_RELEASE_KEY="$(cat release-test.pem)" ENDCORD_RELEASE_PUBLIC_KEY_FILE=release-test.pub \
+            ENDCORD_RELEASE_BASE_URL=http://10.0.2.2:4040/pinned/ node bundle/scripts/sign-release.mjs serve
+          mkdir serve/pinned && cp serve/endcord.min.js serve/endcord.v*.hbc serve/endcord-xposed.apk serve/pinned/
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Build the installer
+        working-directory: android/installer
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug -Pendcord.loaderUrl=http://10.0.2.2:4040/endcord-xposed.apk \
+            -Pendcord.releaseKey="$(cat ../../release-test.pub)"
+          cp app/build/outputs/apk/debug/*.apk ../../installer.apk
+
+      - name: Download the latest stable Discord (for the "already installed" scenario)
+        run: |
+          version=$(curl -sf https://tracker.vendetta.rocks/tracker/index | python3 -c 'import json,sys; print(json.load(sys.stdin)["latest"]["stable"])')
+          echo "Discord $version"
+          mkdir -p discord
+          for split in base config.x86_64 config.en config.xxhdpi; do
+            curl -sfL -o "discord/$split.apk" "https://tracker.vendetta.rocks/tracker/download/$version/$split"
+          done
+          ls -la discord
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run on the emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 8G
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash .github/scripts/emulator-test.sh
+
+      - name: Publish the results
+        if: always()
+        run: |
+          mkdir -p results
+          cd results
+          git init -q -b results
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Emulator run ${{ github.run_id }} on ${{ github.sha }}"
+          # One results branch per tested branch, so parallel runs don't overwrite each other
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "results:refs/heads/test-results/${{ github.ref_name }}/api-${{ matrix.api }}"

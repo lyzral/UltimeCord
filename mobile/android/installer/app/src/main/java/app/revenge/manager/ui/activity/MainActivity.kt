@@ -1,0 +1,65 @@
+package app.revenge.manager.ui.activity
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.core.app.ActivityCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import app.revenge.manager.domain.manager.DiscordSource
+import app.revenge.manager.domain.manager.PreferenceManager
+import app.revenge.manager.ui.screen.home.HomeScreen
+import app.revenge.manager.ui.screen.installer.InstallerScreen
+import app.revenge.manager.ui.theme.RevengeManagerTheme
+import app.revenge.manager.utils.DiscordVersion
+import app.revenge.manager.utils.InstalledDiscord
+import app.revenge.manager.utils.Intents
+import cafe.adriel.voyager.navigator.Navigator
+import cafe.adriel.voyager.transitions.SlideTransition
+import org.koin.android.ext.android.get
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        val version = intent.getStringExtra(Intents.Extras.VERSION)
+
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf("android.permission.POST_NOTIFICATIONS"),
+                0
+            )
+        }
+
+        // Straight into an install only from the app's own update notification: any app can send this activity an
+        // install intent, and only the notification carries the token the app wrote for it
+        val prefs = get<PreferenceManager>()
+        val askedByNotification = intent.action == Intents.Actions.INSTALL &&
+            prefs.pendingInstallToken.isNotEmpty() &&
+            intent.getStringExtra(Intents.Extras.TOKEN) == prefs.pendingInstallToken
+        if (askedByNotification) prefs.pendingInstallToken = ""
+
+        val target = version?.let { DiscordVersion.fromVersionCode(it) }
+        val screen = if (askedByNotification && target != null) {
+            InstallerScreen(target, useInstalled = fromInstalled(target))
+        } else {
+            HomeScreen()
+        }
+
+        setContent {
+            RevengeManagerTheme {
+                Navigator(screen) {
+                    SlideTransition(it)
+                }
+            }
+        }
+    }
+
+    /** An update for the Discord on the phone is built from it, like the install was */
+    private fun fromInstalled(version: DiscordVersion): Boolean =
+        get<PreferenceManager>().discordSource == DiscordSource.INSTALLED && InstalledDiscord.version(this) == version
+}

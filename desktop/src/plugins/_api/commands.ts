@@ -1,0 +1,56 @@
+/*
+ * Ultime Cord, a Discord client mod
+ * Copyright (c) 2022 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { Devs } from "@utils/constants";
+import definePlugin from "@utils/types";
+
+export default definePlugin({
+    name: "CommandsAPI",
+    authors: [Devs.Arjix],
+    description: "Api required by anything that uses commands",
+    patches: [
+        // obtain BUILT_IN_COMMANDS instance
+        {
+            find: ',"tableflip","unflip"',
+            replacement: [
+                {
+                    // Matches BUILT_IN_COMMANDS. This is not exported so this is
+                    // the only way. _init() just returns the same object to make the
+                    // patch simpler
+
+                    // textCommands = builtInCommands.filter(...)
+                    match: /(?<=\w=)(\w)(\.filter\(.{0,60}tableflip)/,
+                    replace: "Endcord.Api.Commands._init($1)$2",
+                },
+                {
+                    // Discord now lists only its own few text commands (gif, me, shrug...) unless an experiment is on,
+                    // from a copy made before any plugin registers its commands. Add the plugins' commands to that list
+                    match: /(let \i=\i\?(\i):)(\i)(?=,\i=\i\.getConfig\(\{location:"getBuiltInCommands"\})/,
+                    replace: "$1Endcord.Api.Commands._withEndcord($3,$2)"
+                }
+            ],
+        },
+        // command error handling
+        {
+            find: "Unexpected value for option",
+            replacement: {
+                // return [2, cmd.execute(args, ctx)]
+                match: /,(\i)\.execute\((\i),(\i)\)/,
+                replace: (_, cmd, args, ctx) => `,Endcord.Api.Commands._handleCommand(${cmd}, ${args}, ${ctx})`
+            }
+        },
+        // Show plugin name instead of "Built-In"
+        {
+            find: "#{intl::COMMANDS_OPTIONAL_COUNT}",
+            replacement: [
+                {
+                    match: /children:(?=\i\?\?\i\?\.name)(?<=command:(\i),.+?)/,
+                    replace: "children:$1.plugin??"
+                }
+            ]
+        }
+    ],
+});

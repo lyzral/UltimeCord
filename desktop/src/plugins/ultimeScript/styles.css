@@ -1,0 +1,281 @@
+.enfer {
+    position: relative;
+    height: min(78vh, 760px);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #120404;
+    font-family: "Cascadia Mono", Consolas, ui-monospace, monospace;
+    color: #ffe2b0;
+}
+
+.enfer-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+}
+
+.enfer-ui {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0 20px 20px;
+    pointer-events: none;
+}
+
+.enfer-panel {
+    pointer-events: auto;
+    width: min(620px, 100%);
+    padding: 16px 18px;
+    background: rgb(26 9 7 / 88%);
+    border: 1px solid rgb(255 120 50 / 45%);
+    box-shadow: 0 0 40px rgb(255 92 38 / 25%), 0 0 0 1px rgb(0 0 0 / 60%) inset;
+}
+
+.enfer-title {
+    white-space: pre;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #ffe2b0;
+}
+
+.enfer-sub {
+    margin: 4px 0 12px;
+    font-size: 12px;
+    color: #b08670;
+}
+
+.enfer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.enfer-group {
+    display: flex;
+    gap: 6px;
+}
+
+.enfer-row {
+    flex: 1;
+    padding: 7px 10px;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    color: #f2c4a4;
+    background: rgb(255 92 38 / 8%);
+    border: 1px solid rgb(255 120 50 / 18%);
+    cursor: pointer;
+}
+
+.enfer-row:hover:not(:disabled) {
+    color: #fff3e0;
+    background: rgb(255 92 38 / 30%);
+    border-color: rgb(255 140 60 / 70%);
+}
+
+.enfer-row:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.enfer-row.danger:not(:disabled) {
+    color: #fff;
+    background: rgb(220 50 20 / 55%);
+}
+
+.enfer select,
+.enfer input:not([type="range"]) {
+    min-width: 0;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 13px;
+    color: #ffe2b0;
+    background: #1c0805;
+    border: 1px solid rgb(255 120 50 / 30%);
+}
+
+.enfer-group input[type="number"] {
+    width: 60px;
+}
+
+.enfer-group select,
+.enfer-group input:not([type="number"]) {
+    flex: 1.4;
+}
+
+.enfer-prog {
+    margin-top: 12px;
+}
+
+.enfer-bar {
+    height: 6px;
+    background: rgb(255 255 255 / 8%);
+    overflow: hidden;
+}
+
+.enfer-bar i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #ff5c26, #ffc46e);
+    transition: width 0.2s;
+}
+
+.enfer-bar i.indet {
+    animation: enfer-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes enfer-pulse {
+    from { opacity: 0.35; }
+    to { opacity: 1; }
+}
+
+.enfer-line,
+.enfer-note {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #f2c4a4;
+}
+
+.enfer-stop {
+    margin-top: 6px;
+    padding: 4px 10px;
+    font: inherit;
+    font-size: 12px;
+    color: #fff;
+    background: rgb(220 50 20 / 60%);
+    border: none;
+    cursor: pointer;
+}
+
+.enfer-opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid rgb(255 120 50 / 18%);
+    font-size: 12px;
+    color: #b08670;
+}
+
+.enfer-opts label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.enfer-opts input[type="range"] {
+    accent-color: #ff5c26;
+}
+
+.enfer-confirm {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 55%);
+}
+
+.enfer-confirm input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.enfer-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+/* ---------- Glass Fluid look (no pixel scene) ---------- */
+.enfer.glass {
+    background:
+        radial-gradient(55% 45% at 10% 0%, rgb(75 82 114 / 45%), transparent 70%),
+        radial-gradient(45% 40% at 100% 100%, rgb(63 69 96 / 30%), transparent 70%),
+        #000;
+    font-family: var(--font-primary);
+    color: #fff;
+}
+
+.enfer.glass .enfer-ui {
+    align-items: center;
+}
+
+.enfer.glass .enfer-panel {
+    border-radius: 18px;
+    background: rgb(70 70 70 / 20%);
+    border: 1px solid rgb(255 255 255 / 8%);
+    box-shadow: 0 24px 60px rgb(0 0 0 / 50%);
+    backdrop-filter: blur(24px);
+}
+
+.enfer.glass .enfer-title {
+    font-size: 20px;
+    letter-spacing: 0;
+    color: #fff;
+}
+
+.enfer.glass .enfer-sub,
+.enfer.glass .enfer-opts {
+    color: rgb(255 255 255 / 45%);
+}
+
+.enfer.glass .enfer-row,
+.enfer.glass select,
+.enfer.glass input:not([type="range"]) {
+    border-radius: 10px;
+    color: rgb(255 255 255 / 85%);
+    background: rgb(255 255 255 / 4%);
+    border: 1px solid rgb(255 255 255 / 8%);
+    font-family: var(--font-primary);
+}
+
+.enfer.glass .enfer-row:hover:not(:disabled) {
+    color: #fff;
+    background: rgb(255 255 255 / 9%);
+    border-color: rgb(255 255 255 / 20%);
+}
+
+.enfer.glass .enfer-row.danger:not(:disabled) {
+    color: #000;
+    background: #d9d9dd;
+}
+
+.enfer.glass .enfer-bar i {
+    background: #d9d9dd;
+}
+
+.enfer.glass .enfer-opts input[type="range"] {
+    accent-color: #d9d9dd;
+}
+
+/* paradise palette for the pixel panel */
+.enfer.paradis:not(.glass) .enfer-panel {
+    background: rgb(230 240 255 / 82%);
+    border-color: rgb(255 210 120 / 70%);
+    box-shadow: 0 0 40px rgb(255 220 150 / 45%);
+}
+
+.enfer.paradis:not(.glass) .enfer-title { color: #3a4a6a; }
+.enfer.paradis:not(.glass) .enfer-sub,
+.enfer.paradis:not(.glass) .enfer-opts,
+.enfer.paradis:not(.glass) .enfer-line,
+.enfer.paradis:not(.glass) .enfer-note { color: #5a6a8a; }
+
+.enfer.paradis:not(.glass) .enfer-row,
+.enfer.paradis:not(.glass) select,
+.enfer.paradis:not(.glass) input:not([type="range"]) {
+    color: #2a3a5a;
+    background: rgb(255 255 255 / 60%);
+    border-color: rgb(255 210 120 / 50%);
+}
+
+.enfer.paradis:not(.glass) .enfer-row:hover:not(:disabled) {
+    background: rgb(255 230 170 / 80%);
+    color: #1a2a4a;
+}

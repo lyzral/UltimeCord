@@ -1,0 +1,67 @@
+/*
+ * Ultime Cord, a Discord client mod
+ * Copyright (c) 2022 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { EndcordOnly } from "@api/EndcordVisibility";
+import ErrorBoundary from "@components/ErrorBoundary";
+import { Logger } from "@utils/Logger";
+import { JSX, ReactNode } from "react";
+
+export type MessageAccessoryFactory = (props: Record<string, any>) => ReactNode;
+export type MessageAccessory = {
+    render: MessageAccessoryFactory;
+    position?: number;
+};
+
+export const accessories = new Map<string, MessageAccessory>();
+
+export function addMessageAccessory(
+    identifier: string,
+    render: MessageAccessoryFactory,
+    position?: number
+) {
+    accessories.set(identifier, {
+        render,
+        position,
+    });
+}
+
+export function removeMessageAccessory(identifier: string) {
+    accessories.delete(identifier);
+}
+
+export function _modifyAccessories(
+    elements: JSX.Element[],
+    props: Record<string, any>
+) {
+    if (accessories.size === 0) return elements;
+
+    try {
+        for (const [key, accessory] of accessories.entries()) {
+            const res = (
+                <EndcordOnly key={key}>
+                    <ErrorBoundary noop message={`Failed to render ${key} Message Accessory`}>
+                        <accessory.render {...props} />
+                    </ErrorBoundary>
+                </EndcordOnly>
+            );
+
+            elements.splice(
+                accessory.position != null
+                    ? accessory.position < 0
+                        ? elements.length + accessory.position
+                        : accessory.position
+                    : elements.length,
+                0,
+                res
+            );
+        }
+
+        return elements;
+    } catch (e) {
+        new Logger("MessageAccessories").error("Failed to modify message accessories", e);
+        return elements;
+    }
+}

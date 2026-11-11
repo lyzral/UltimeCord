@@ -1,0 +1,36 @@
+{
+  "$meta": {
+    "name": "Ultime Cord Official Plugins",
+    "description": "Official Ultime Cord plugin source pack."
+  },
+  "fakeprofile": {
+    "version": "1.0.0",
+    "alwaysFetch": true,
+    "kind": "bundled"
+  },
+  "notrack": {
+    "version": "1.0.0",
+    "alwaysFetch": true,
+    "kind": "source"
+  },
+  "messagefix": {
+    "version": "1.0.0",
+    "alwaysFetch": true,
+    "kind": "source"
+  },
+  "quickinstall": {
+    "version": "1.0.0",
+    "alwaysFetch": true,
+    "kind": "source"
+  },
+  "ultimecord-enhancements": {
+    "version": "1.0.0",
+    "alwaysFetch": true,
+    "kind": "source"
+  },
+  "badges": {
+    "version": "1.0.0",
+    "alwaysFetch": true,
+    "kind": "source"
+  }
+}

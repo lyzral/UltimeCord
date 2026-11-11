@@ -1,0 +1,90 @@
+name: Build DevBuild
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - .github/workflows/build.yml
+            - src/**
+            - browser/**
+            - scripts/build/**
+            - package.json
+            - pnpm-lock.yaml
+env:
+    FORCE_COLOR: true
+
+# Read-only unless a job asks for more
+permissions:
+    contents: read
+
+jobs:
+    Build:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+            - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6, installs pnpm using packageManager key in package.json
+
+            - name: Use Node.js 24
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+              with:
+                  node-version: 24
+                  cache: "pnpm"
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build web
+              run: pnpm buildWebStandalone
+
+            - name: Build
+              run: pnpm build --standalone
+
+            - name: Generate plugin list
+              run: pnpm generatePluginJson dist/plugins.json dist/plugin-readmes.json
+
+            - name: Clean up obsolete files
+              run: |
+                  rm -rf dist/*-unpacked dist/vendor Endcord.user.css endcordDesktopRenderer.css endcordDesktopRenderer.css.map
+
+            - name: Get some values needed for the release
+              id: release_values
+              run: |
+                  echo "release_tag=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+            - name: Upload DevBuild as release
+              if: github.repository == 'Endcord/Endcord'
+              run: |
+                  gh release create devbuild --title "DevBuild" --notes "Automated build of the latest commit. Not a release: these files are unsigned and the updater never installs them. Install Endcord from https://endcord.com/download" || true
+                  gh release upload devbuild --clobber dist/*
+                  gh release edit devbuild --title "DevBuild $RELEASE_TAG"
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_TAG: ${{ env.release_tag }}
+
+            - name: Upload DevBuild to builds repo
+              if: github.repository == 'Endcord/Endcord'
+              continue-on-error: true
+              run: |
+                  git config --global user.name "$USERNAME"
+                  git config --global user.email actions@github.com
+
+                  # The token travels in a header git never prints, not in the remote address git echoes on errors
+                  auth="http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$API_TOKEN" | base64 -w0)"
+                  git -c "$auth" clone https://github.com/$GH_REPO.git upload
+                  cd upload
+
+                  GLOBIGNORE=.git:.gitignore:README.md:LICENSE
+                  rm -rf *
+                  cp -r ../dist/* .
+
+                  git add -A
+                  git commit -m "Builds for https://github.com/$GITHUB_REPOSITORY/commit/$GITHUB_SHA"
+                  git -c "$auth" push --force origin HEAD
+              env:
+                  API_TOKEN: ${{ secrets.BUILDS_TOKEN }}
+                  GH_REPO: rootpoii/builds
+                  USERNAME: GitHub-Actions

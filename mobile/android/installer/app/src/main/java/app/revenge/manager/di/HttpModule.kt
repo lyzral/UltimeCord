@@ -1,0 +1,44 @@
+package app.revenge.manager.di
+
+import app.revenge.manager.network.service.HttpService
+import app.revenge.manager.network.service.RestService
+import app.revenge.manager.network.utils.Ipv4FirstDns
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.module
+
+val httpModule = module {
+
+    fun provideJson() = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    fun provideHttpClient(json: Json) = HttpClient(OkHttp) {
+        engine {
+            config {
+                dns(Ipv4FirstDns)
+            }
+        }
+
+        install(ContentNegotiation) {
+            json(json)
+        }
+
+        install(HttpTimeout) {
+            socketTimeoutMillis = 15000
+            connectTimeoutMillis = 15000
+        }
+    }
+
+    singleOf(::provideJson)
+    singleOf(::provideHttpClient)
+    singleOf(::HttpService)
+    singleOf(::RestService)
+
+}

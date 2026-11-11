@@ -1,0 +1,435 @@
+name: iOS
+
+# Builds the iOS tweak (ios/) and, given a decrypted Discord IPA, Discord with the tweak injected. The tweak downloads
+# the same bundle as Android from builds-next, so the IPA only needs a new build when the tweak or Discord changes.
+#
+# On next it's published as this repository's ios-v<tweak version> release, with an AltStore source on builds-ios.
+# ios-ci/ branches (not ci/, which run the Android build and the emulator test) build everything without publishing
+# and put the tweak, the build log and a report on test-results/<branch>.
+on:
+  push:
+    branches: [next, "ios-ci/**"]
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: Direct link to a decrypted Discord IPA (otherwise the DISCORD_IPA_URL secret)
+        required: false
+        type: string
+      release:
+        description: Publish the release (on next)
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only for every job; the ones that publish ask for more themselves
+permissions:
+  contents: read
+
+jobs:
+  tweak:
+    name: Tweak
+    runs-on: macos-15
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: Randomblock1/theos-action@4e23d15886bca77b5f7c462a82567e0de33ebe0b # v1.5
+      - name: Build
+        id: build
+        working-directory: ios
+        shell: bash
+        run: |
+          mkdir -p out
+          # Theos needs GNU make 4; macOS has 3.81
+          export PATH="$(brew --prefix make)/libexec/gnubin:$PATH"
+          # Strict once releases are signed: until the key is there, a strict tweak would refuse every bundle
+          make package ENDCORD_REQUIRE_SIGNED=${{ secrets.ENDCORD_RELEASE_KEY != '' && '1' || '' }} 2>&1 | tee out/build.log
+          cp packages/*.deb out/
+          cp "$(find .theos/_ -name Endcord.dylib | head -n 1)" out/Endcord.dylib
+          # This message is compiled out unless the tweak refuses unsigned bundles
+          if [ "${{ secrets.ENDCORD_RELEASE_KEY != '' }}" = true ] && ! grep -aq 'No signed release' out/Endcord.dylib; then
+            echo "::error::The signing key is set, but this tweak isn't strict"
+            exit 1
+          fi
+          echo "version=$(sed -n 's/^Version: //p' control)" >> "$GITHUB_OUTPUT"
+          ls -l out
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        # With the build log alone when the build fails
+        if: always()
+        with:
+          name: tweak
+          path: ios/out/
+
+  simulator:
+    # The tweak in a stand-in for Discord with Discord's Hermes, on the iOS simulator: loading the bundle (bytecode, the
+    # fallback, updates, the cache, offline), the bridge, themes, fonts, safe mode and the recovery menu
+    # (ios/Tests/run.sh). Publishing waits for it.
+    name: Simulator test (bytecode ${{ matrix.bytecode }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        bytecode: [98, 99]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: Randomblock1/theos-action@4e23d15886bca77b5f7c462a82567e0de33ebe0b # v1.5
+      - name: Build the tweak for the simulator
+        working-directory: ios
+        shell: bash
+        run: |
+          mkdir -p ../results
+          export PATH="$(brew --prefix make)/libexec/gnubin:$PATH"
+          # Signed ad hoc: the simulator needs a signature, not a developer's
+          make TARGET=simulator:clang:latest:15.0 ARCHS=arm64 Endcord_USE_SUBSTRATE=0 TARGET_CODESIGN_FLAGS="-f -s -" \
+            ENDCORD_BUNDLE_URL=http://127.0.0.1:4040/endcord.min.js ENDCORD_RELEASE_KEY="$(cat Tests/release-test-key.pub)" \
+            2>&1 | tee ../results/tweak-build.log
+          find .theos/obj -name "*.dylib"
+          cp "$(find .theos/obj -name Endcord.dylib | head -n 1)" ../Endcord-simulator.dylib
+      - name: Test
+        shell: bash
+        run: bash ios/Tests/run.sh Endcord-simulator.dylib ${{ matrix.bytecode }} results
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: simulator-${{ matrix.bytecode }}
+          path: results/
+
+  ipa:
+    name: IPA
+    needs: tweak
+    # Intel: this job only rewrites the IPA (cyan, plutil, otool), and GitHub's arm64 macOS runners are short of
+    # capacity, which dropped it before it started. macos-15-intel retires in 2027; then it's macos-15 again.
+    runs-on: macos-15-intel
+    outputs:
+      discord-version: ${{ steps.inject.outputs.discord-version }}
+    env:
+      # Without one of its own, RainTweak's public release, which is the Discord this was tested with; pinned by hash
+      IPA_URL: ${{ inputs.ipa_url || secrets.DISCORD_IPA_URL || 'https://github.com/ra1ncord/RainTweak/releases/download/v1.2.0/RainTweak.ipa' }}
+      IPA_SHA256: ${{ (inputs.ipa_url || secrets.DISCORD_IPA_URL) && '' || '98225b128f99c0ac0ffe810ddcb781c73f01da4ce56dbf640a52cf84df0d6549' }}
+    steps:
+      - name: Check for a Discord IPA
+        id: source
+        run: |
+          if [ -z "$IPA_URL" ]; then
+            echo "::notice::No Discord IPA: set the DISCORD_IPA_URL secret, or run this workflow with a link to one"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        if: steps.source.outputs.skip != 'true'
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        if: steps.source.outputs.skip != 'true'
+        with:
+          name: tweak
+          path: ${{ runner.temp }}/tweak
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        if: steps.source.outputs.skip != 'true'
+        with:
+          python-version: "3.12"
+      - name: Inject the tweak
+        id: inject
+        if: steps.source.outputs.skip != 'true'
+        shell: bash
+        run: |
+          # Also into a log the ios-ci/ report carries, as Actions logs can't be read without signing in
+          exec > >(tee -a "$GITHUB_WORKSPACE/ipa.log") 2>&1
+          pip install "https://github.com/asdfzxcvbn/pyzule-rw/archive/740d3716dcd98c20c000f12cdb88f1f0b2a533a4.zip" Pillow
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/discord.ipa" "$IPA_URL"
+          if [ -n "$IPA_SHA256" ]; then
+            echo "$IPA_SHA256  $RUNNER_TEMP/discord.ipa" | shasum -a 256 -c -
+          fi
+
+          # Discord alone goes in: a tweak the IPA came with would run next to Endcord
+          mkdir "$RUNNER_TEMP/source"
+          unzip -q "$RUNNER_TEMP/discord.ipa" -d "$RUNNER_TEMP/source"
+          if [ -f "$RUNNER_TEMP/source/Payload/Discord.app/Frameworks/RainTweak.dylib" ]; then
+            node ios/scripts/remove-dylib.cjs "$RUNNER_TEMP/source/Payload/Discord.app/Discord" "@rpath/RainTweak.dylib"
+            rm "$RUNNER_TEMP/source/Payload/Discord.app/Frameworks/RainTweak.dylib"
+            rm "$RUNNER_TEMP/discord.ipa"
+            (cd "$RUNNER_TEMP/source" && zip -qry "$RUNNER_TEMP/discord.ipa" Payload)
+          fi
+          unzip -p "$RUNNER_TEMP/discord.ipa" "Payload/Discord.app/Info.plist" > "$RUNNER_TEMP/Info.plist"
+          version=$(plutil -extract CFBundleShortVersionString raw "$RUNNER_TEMP/Info.plist")
+          echo "Discord $version"
+          echo "discord-version=$version" >> "$GITHUB_OUTPUT"
+
+          # Discord's icon, given to cyan so it's read from plain files: a decrypted IPA is thinned for the device it came
+          # from, and iOS draws a blank icon when the asset catalog has no size for its screen
+          unzip -p "$RUNNER_TEMP/discord.ipa" 'Payload/Discord.app/AppIcon76x76@2x~ipad.png' > "$RUNNER_TEMP/discord-icon.png"
+          node ios/scripts/cgbi-to-png.cjs "$RUNNER_TEMP/discord-icon.png" "$RUNNER_TEMP/icon.png"
+
+          # -u: any device, -w: no watch app, -s: fakesigned for TrollStore, -g: without encrypted extensions, -q: arm64 only,
+          # -d: Endcord's files in the Files app, which the recovery menu's Open App Folder opens
+          cyan -i "$RUNNER_TEMP/discord.ipa" -o Endcord.ipa -f "$RUNNER_TEMP"/tweak/*.deb \
+            -n Endcord -k "$RUNNER_TEMP/icon.png" -uwsgqd
+          ls -l Endcord.ipa
+
+          mkdir "$RUNNER_TEMP/endcord" && unzip -q Endcord.ipa -d "$RUNNER_TEMP/endcord"
+          app=$(echo "$RUNNER_TEMP"/endcord/Payload/*.app)
+
+          # cyan stops at @2x, which a 3x iPhone would blur
+          icon=$(plutil -extract CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconFiles.0 raw "$app/Info.plist")
+          sips -z 180 180 "$RUNNER_TEMP/icon.png" --out "$app/$icon@3x.png"
+
+          # The screen share extension loads the tweak too, for the app group it shares with the app (Sideloading.x),
+          # and is listed as Endcord beside the App Store Discord's. cyan injects the main app only.
+          extension="$app/PlugIns/BroadcastUpload.appex"
+          if [ -f "$extension/BroadcastUpload" ]; then
+            tools=$(python -c 'from cyan import tbhutils; print(tbhutils.get_tools_dir()[1])')
+            node ios/scripts/insert-dylib.cjs "$extension/BroadcastUpload" "$extension/BroadcastUpload" "@rpath/Endcord.dylib"
+            plutil -replace CFBundleDisplayName -string Endcord "$extension/Info.plist"
+            # cyan's -s, again for this binary, for TrollStore; other installers sign it themselves
+            "$tools/ldid" -S -M "$extension/BroadcastUpload" || echo "::warning::The extension isn't fakesigned"
+          else
+            echo "::warning::No decrypted BroadcastUpload extension: screen share won't work in this IPA"
+          fi
+          rm Endcord.ipa
+          (cd "$RUNNER_TEMP/endcord" && zip -qry "$GITHUB_WORKSPACE/Endcord.ipa" Payload)
+          ls -l Endcord.ipa
+
+          if [ -e "$app/Frameworks/RainTweak.dylib" ] || otool -L "$app/Discord" | grep -q RainTweak; then
+            echo "::error::The IPA still has RainTweak in it"
+            exit 1
+          fi
+          if ! otool -L "$app/Discord" | grep -q Endcord.dylib; then
+            echo "::error::Discord doesn't load Endcord"
+            exit 1
+          fi
+
+          # What can be checked without a device. The tweak takes JSI from Discord's Hermes at run time (linked with
+          # -undefined dynamic_lookup), so a symbol this Discord doesn't export would crash it on launch
+          for binary in "$app/$(plutil -extract CFBundleExecutable raw "$app/Info.plist")" "$app"/Frameworks/*.framework/* "$app"/Frameworks/*.dylib; do
+            if [ -f "$binary" ]; then
+              case "$(file -b "$binary")" in *Mach-O*) nm -gU "$binary" 2>/dev/null | awk '{ print $NF }' || true ;; esac
+            fi
+          done | sort -u > "$RUNNER_TEMP/exported.txt"
+          nm -u "$RUNNER_TEMP/tweak/Endcord.dylib" | { grep 'facebook3jsi' || true; } | sort -u > "$RUNNER_TEMP/needed.txt"
+          missing=$(comm -23 "$RUNNER_TEMP/needed.txt" "$RUNNER_TEMP/exported.txt")
+          if [ -n "$missing" ]; then
+            echo "::error::Discord $version doesn't export JSI the tweak uses:"
+            echo "$missing"
+            exit 1
+          fi
+          echo "All $(wc -l < "$RUNNER_TEMP/needed.txt") JSI symbols the tweak uses are exported by Discord $version"
+          # The tweak loads Endcord from RCTHost's instance:didInitializeRuntime:, which bridgeless Discord calls
+          if ! grep -rqa "instance:didInitializeRuntime:" "$app"; then
+            echo "::error::Discord $version has no instance:didInitializeRuntime: for the tweak to hook"
+            exit 1
+          fi
+          # The bundle the tweak will download for this Discord: endcord.v<version>.hbc, or endcord.min.js without one
+          if [ -f "$app/main.jsbundle" ]; then
+            bytecode=$(od -An -t u4 -j 8 -N 4 "$app/main.jsbundle" | tr -d ' ')
+            echo "Discord's bundle is Hermes bytecode version $bytecode"
+            if ! curl -fsI "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/builds-next/endcord.v$bytecode.hbc" > /dev/null; then
+              echo "::warning::No endcord.v$bytecode.hbc on builds-next: this Discord will run endcord.min.js"
+            fi
+          else
+            echo "::warning::Discord $version has no main.jsbundle, where the tweak reads its bytecode version"
+          fi
+
+          # What the AltStore source has to declare: AltStore refuses an app whose entitlements (of the app and its
+          # extensions) and privacy usage descriptions differ from its source's, and the build number has to match
+          python - "$RUNNER_TEMP/endcord" app.json <<'EOF'
+          import glob, json, plistlib, subprocess, sys
+          app = glob.glob(f"{sys.argv[1]}/Payload/*.app")[0]
+          entitlements, privacy = set(), {}
+          for bundle in [app, *glob.glob(f"{app}/PlugIns/*.appex"), *glob.glob(f"{app}/Extensions/*.appex")]:
+              signed = subprocess.run(["codesign", "-d", "--entitlements", "-", "--xml", bundle], capture_output=True).stdout
+              if signed.strip():
+                  entitlements.update(plistlib.loads(signed))
+              with open(f"{bundle}/Info.plist", "rb") as f:
+                  for key, value in plistlib.load(f).items():
+                      if key.endswith("UsageDescription") and isinstance(value, str):
+                          privacy.setdefault(key, value)
+          # Every app has these, so sources leave them out
+          entitlements -= {"application-identifier", "com.apple.developer.team-identifier"}
+          with open(f"{app}/Info.plist", "rb") as f:
+              info = plistlib.load(f)
+          with open(sys.argv[2], "w") as f:
+              json.dump({
+                  "buildVersion": info["CFBundleVersion"],
+                  "minOSVersion": info.get("MinimumOSVersion", "15.0"),
+                  "appPermissions": {"entitlements": sorted(entitlements), "privacy": privacy},
+              }, f, indent=2)
+          EOF
+          cat app.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: steps.source.outputs.skip != 'true'
+        with:
+          name: ipa
+          path: |
+            Endcord.ipa
+            app.json
+          compression-level: 0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always() && steps.source.outputs.skip != 'true'
+        with:
+          name: ipa-log
+          path: |
+            ipa.log
+            app.json
+          if-no-files-found: ignore
+
+  report:
+    name: Publish the test build
+    needs: [tweak, simulator, ipa]
+    if: always() && startsWith(github.ref, 'refs/heads/ios-ci/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: tweak
+          path: results
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        # Only when there was a Discord IPA to build from
+        continue-on-error: true
+        with:
+          name: ipa-log
+          path: results
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        continue-on-error: true
+        with:
+          pattern: simulator-*
+          path: results
+      - name: Push
+        # Only the tweak and a report: the IPA is Discord's app and never goes into this repository
+        env:
+          # Through the environment, not into the script: the versions are read from the tweak and the IPA
+          TWEAK_RESULT: ${{ needs.tweak.result }}
+          TWEAK_VERSION: ${{ needs.tweak.outputs.version }}
+          SIMULATOR_RESULT: ${{ needs.simulator.result }}
+          IPA_RESULT: ${{ needs.ipa.result }}
+          DISCORD_VERSION: ${{ needs.ipa.outputs.discord-version }}
+        run: |
+          cd results
+          {
+            echo "run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "commit: $GITHUB_SHA"
+            echo "tweak: $TWEAK_RESULT $TWEAK_VERSION"
+            echo "simulator: $SIMULATOR_RESULT"
+            echo "ipa: $IPA_RESULT"
+            echo "discord: $DISCORD_VERSION"
+          } > report.txt
+          git init -q -b results
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "iOS build ${{ github.run_id }} on ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "results:refs/heads/test-results/${{ github.ref_name }}"
+
+  publish:
+    name: Publish the release
+    needs: [tweak, simulator, ipa]
+    # Without a Discord IPA (no DISCORD_IPA_URL secret), the dylib and the .deb alone, for people's own IPAs
+    if: >-
+      github.ref == 'refs/heads/next' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.release))
+    runs-on: ubuntu-latest
+    # Publishes with the release environment's approval, like the Build workflow's deploy job
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DISCORD_VERSION: ${{ needs.ipa.outputs.discord-version }}
+      TWEAK_VERSION: ${{ needs.tweak.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: tweak
+          path: ${{ runner.temp }}/out
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        if: needs.ipa.outputs.discord-version != ''
+        with:
+          name: ipa
+          path: ${{ runner.temp }}/out
+      - name: Release
+        # One release per tweak version, whose files a new Discord replaces: a release every Discord update would push
+        # the installer's own out of the 20 newest releases it looks through for updates. Never marked as the latest.
+        run: |
+          tag="ios-v$TWEAK_VERSION"
+          cd "$RUNNER_TEMP/out"
+          ls -l
+          files=(Endcord.dylib *.deb)
+          if [ -n "$DISCORD_VERSION" ]; then
+            files=(Endcord.ipa "${files[@]}")
+            title="Endcord for iOS $TWEAK_VERSION (Discord $DISCORD_VERSION)"
+            notes="Endcord $TWEAK_VERSION in Discord $DISCORD_VERSION, built from ${{ github.sha }}.
+
+          - **Endcord.ipa**: install it with AltStore, SideStore, Feather, ESign, KSign, Sideloadly or TrollStore
+          - **Endcord.dylib**: to inject into your own decrypted Discord IPA (332 or newer)
+          - **.deb**: for jailbroken devices (rootless)
+
+          AltStore and SideStore source: https://raw.githubusercontent.com/${{ github.repository }}/builds-ios/apps.json"
+          else
+            title="Endcord for iOS $TWEAK_VERSION"
+            notes="Endcord $TWEAK_VERSION, built from ${{ github.sha }}.
+
+          - **Endcord.dylib**: to inject into your own decrypted Discord IPA (332 or newer) with Feather, ESign, KSign or Sideloadly
+          - **.deb**: for jailbroken devices (rootless)"
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$tag" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+              --title "$title" --notes "$notes" "${files[@]}"
+          fi
+          [ -f Endcord.ipa ] && echo "SIZE=$(stat -c %s Endcord.ipa)" >> "$GITHUB_ENV"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+      - name: Update the AltStore source
+        if: needs.ipa.outputs.discord-version != ''
+        # builds-ios holds only apps.json, which AltStore and SideStore add as a source and update Endcord from. Its one
+        # version is the release's current IPA, which every rebuild replaces at the same URL.
+        run: |
+          mkdir source
+          cd source
+          node - <<'EOF'
+          const fs = require("fs");
+          const { DISCORD_VERSION, SIZE, TAG, GITHUB_REPOSITORY, RUNNER_TEMP } = process.env;
+          // The build number, minimum iOS and permissions read from the IPA by the IPA job
+          const app = JSON.parse(fs.readFileSync(`${RUNNER_TEMP}/out/app.json`, "utf8"));
+          const icon = `https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/next/bundle/src/assets/icons/endcord.png`;
+          const source = {
+            name: "Endcord",
+            identifier: "com.endcord.source",
+            subtitle: "Plugins, themes and privacy for Discord",
+            iconURL: icon,
+            website: "https://endcord.com",
+            apps: [{
+              name: "Endcord",
+              bundleIdentifier: "com.hammerandchisel.discord",
+              developerName: "Endcord",
+              subtitle: "Plugins, themes and privacy for Discord",
+              localizedDescription: "Discord with Endcord: 300+ plugins, themes and five languages.",
+              iconURL: icon,
+              tintColor: "#7AB8F5",
+              category: "social",
+              appPermissions: app.appPermissions,
+              versions: [{
+                version: DISCORD_VERSION,
+                buildVersion: app.buildVersion,
+                date: new Date().toISOString(),
+                size: Number(SIZE),
+                downloadURL: `https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Endcord.ipa`,
+                minOSVersion: app.minOSVersion,
+              }],
+            }],
+            news: [],
+          };
+          fs.writeFileSync("apps.json", JSON.stringify(source, null, 2) + "\n");
+          EOF
+          git init -q -b builds-ios
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps.json
+          git commit -qm "Endcord $TWEAK_VERSION in Discord $DISCORD_VERSION"
+          git push -qf "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" builds-ios

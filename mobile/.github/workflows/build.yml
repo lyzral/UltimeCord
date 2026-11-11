@@ -1,0 +1,254 @@
+name: Build
+
+on:
+  push:
+    # ci/ branches build everything a release does, without publishing it
+    branches: [next, "ci/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only for every job; the one that publishes asks for more itself
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        working-directory: bundle
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        working-directory: bundle
+        run: node node_modules/typescript/bin/tsc --noEmit -p .
+      - name: Lint
+        working-directory: bundle
+        run: bun run lint
+      - name: Check the translations
+        working-directory: bundle
+        # Without Endcord PC checked out, the shipped translations are checked: every string in all five languages
+        run: node scripts/i18n-sync.mjs --strict
+      - name: Build
+        working-directory: bundle
+        run: bun run build --release-branch ${{ github.ref_name }} --build-minify
+      - name: Precompile to Hermes bytecode
+        working-directory: bundle
+        # endcord.v<version>.hbc for the bytecode versions Discord ships; the loader picks the one matching the
+        # Discord it runs in and falls back to endcord.min.js
+        run: node scripts/hermes.mjs
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bundle
+          path: |
+            bundle/dist/endcord.min.js
+            bundle/dist/endcord.v*.hbc
+
+  loader:
+    name: Loader (Xposed module)
+    runs-on: ubuntu-latest
+    env:
+      LOADER_KEYSTORE: ${{ secrets.LOADER_KEYSTORE }}
+      KEYSTORE_PASSWORD: ${{ secrets.LOADER_KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.LOADER_KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.LOADER_KEY_PASSWORD }}
+      # Strict once releases are signed: until the key is there, a strict loader would refuse every bundle
+      REQUIRE_SIGNED: ${{ secrets.ENDCORD_RELEASE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - name: Unit tests
+        working-directory: android/loader
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:testDebugUnitTest
+      - name: Build
+        working-directory: android/loader
+        run: |
+          if [ -n "$LOADER_KEYSTORE" ]; then
+            echo "$LOADER_KEYSTORE" | base64 -d > "$RUNNER_TEMP/loader.jks"
+            export KEYSTORE_FILE="$RUNNER_TEMP/loader.jks"
+            ./gradlew --no-daemon :app:assembleRelease -Pendcord.requireSigned=$REQUIRE_SIGNED
+            cp app/build/outputs/apk/release/app-release.apk endcord-xposed.apk
+            # This message is compiled out unless the loader refuses unsigned bundles
+            if [ "$REQUIRE_SIGNED" = true ] && ! unzip -p endcord-xposed.apk 'classes*.dex' | grep -aq 'No signed release'; then
+              echo "::error::The signing key is set, but this loader isn't strict"
+              exit 1
+            fi
+          else
+            echo "::warning::No LOADER_KEYSTORE secret: publishing the debug-signed module instead"
+            ./gradlew --no-daemon :app:assembleDebug -Pendcord.requireSigned=$REQUIRE_SIGNED
+            cp app/build/outputs/apk/debug/app-debug.apk endcord-xposed.apk
+          fi
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: loader
+          path: android/loader/endcord-xposed.apk
+
+  installer:
+    name: Installer
+    runs-on: ubuntu-latest
+    env:
+      INSTALLER_KEYSTORE: ${{ secrets.INSTALLER_KEYSTORE }}
+      KEYSTORE_PASSWORD: ${{ secrets.INSTALLER_KEYSTORE_PASSWORD }}
+      KEYSTORE_ENTRY_ALIAS: ${{ secrets.INSTALLER_KEY_ALIAS }}
+      KEYSTORE_ENTRY_PASSWORD: ${{ secrets.INSTALLER_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - name: Build
+        working-directory: android/installer
+        run: |
+          chmod +x gradlew
+          # Signed like the releases when the INSTALLER_KEYSTORE secrets exist, so either can update the other;
+          # otherwise with the debug key
+          if [ -n "$INSTALLER_KEYSTORE" ]; then
+            echo "$INSTALLER_KEYSTORE" | base64 -d > app/keystore.jks
+          else
+            echo "::warning::No INSTALLER_KEYSTORE secret: publishing a debug-signed installer"
+          fi
+          ./gradlew --no-daemon :app:assembleRelease
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: installer
+          path: android/installer/app/build/outputs/apk/release/*.apk
+
+  classic-installer:
+    # The installer offers Endcord Classic, on Aliucord's older Discord, through its own installer, which lives on the
+    # main branch and is published next to this one
+    name: Endcord Classic Installer
+    runs-on: ubuntu-latest
+    # Signed with the installer key, like main's own Endcord Classic installer releases, so either can update the other
+    env:
+      SIGNING_STORE_BASE64: ${{ secrets.INSTALLER_KEYSTORE }}
+      SIGNING_STORE_PASSWORD: ${{ secrets.INSTALLER_KEYSTORE_PASSWORD }}
+      SIGNING_KEY_ALIAS: ${{ secrets.INSTALLER_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.INSTALLER_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: platform-tools
+      - name: Build
+        working-directory: installer
+        run: |
+          chmod +x gradlew
+          if [ -n "$SIGNING_STORE_BASE64" ]; then
+            echo "$SIGNING_STORE_BASE64" | base64 -d > "$RUNNER_TEMP/classic.jks"
+            export SIGNING_STORE_FILE="$RUNNER_TEMP/classic.jks"
+          else
+            echo "::warning::No INSTALLER_KEYSTORE secret: publishing a debug-signed Classic installer"
+          fi
+          ./gradlew --no-daemon :app:assembleRelease
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: classic-installer
+          path: installer/app/build/outputs/apk/release/*.apk
+
+  deploy:
+    name: Publish to the builds-next branch
+    needs: [bundle, loader, installer, classic-installer]
+    # Also when run by hand on next, to rebuild it without a new commit (after the signing secrets change, say)
+    if: github.ref == 'refs/heads/next' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # The signing key is this environment's secret: give it required reviewers in the repository settings and every
+    # publish waits for one, so a push to next alone can't sign a build
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      # Downloaded outside the checkout: builds-next tracks files with the same names, and untracked copies of them in
+      # the working tree make git refuse to switch branches
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: bundle
+          path: ${{ runner.temp }}/out
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: loader
+          path: ${{ runner.temp }}/out
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: installer
+          path: ${{ runner.temp }}/installer
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: classic-installer
+          path: ${{ runner.temp }}/classic-installer
+      - name: Add the installers
+        # Debug-signed until the INSTALLER_KEYSTORE secrets exist; releases come from the Release Installer workflow
+        run: |
+          cp "$RUNNER_TEMP"/installer/*.apk "$RUNNER_TEMP"/out/endcord-installer.apk
+          cp "$RUNNER_TEMP"/classic-installer/*.apk "$RUNNER_TEMP"/out/endcord-classic-installer.apk
+      - name: Write build info
+        run: |
+          cat > "$RUNNER_TEMP"/out/data.json <<EOF
+          {
+            "bundle": "endcord.min.js",
+            "bytecode": [$(cd "$RUNNER_TEMP"/out && ls endcord.v*.hbc | sed "s/.*/\"&\"/" | paste -sd, -)],
+            "loader": "endcord-xposed.apk",
+            "installer": "endcord-installer.apk",
+            "classicInstaller": "endcord-classic-installer.apk",
+            "loaderVersion": "$(sed -nE 's/^\s*versionName = "(.*)"/\1/p' android/loader/app/build.gradle.kts)",
+            "loaderVersionCode": $(sed -nE 's/^\s*versionCode = ([0-9]+)/\1/p' android/loader/app/build.gradle.kts),
+            "commit": "${{ github.sha }}",
+            "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          cat "$RUNNER_TEMP"/out/data.json
+      - name: Push
+        # builds-next only serves the latest files, so every build replaces it with a single commit. Keeping old builds
+        # in its history would grow the repository by the size of the APKs on every push. The signed release goes in a
+        # second commit, as it names the first: the loaders fetch the bundles, and the installer the loader and the
+        # installers, from that commit's addresses, which the CDN can't answer with an older build. The key is never on
+        # the server, so what's there can't be re-signed.
+        env:
+          ENDCORD_RELEASE_KEY: ${{ secrets.ENDCORD_RELEASE_KEY }}
+        run: |
+          mkdir "$RUNNER_TEMP/signing"
+          cp bundle/scripts/sign-release.mjs bundle/release-key.pub "$RUNNER_TEMP/signing/"
+          git config http.postBuffer 524288000
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan builds-next
+          git rm -rf --quiet .
+          cp "$RUNNER_TEMP"/out/* .
+          git add -A
+          git commit -m "Build ${{ github.sha }}"
+          if [ -n "$ENDCORD_RELEASE_KEY" ]; then
+            ENDCORD_RELEASE_BASE_URL="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$(git rev-parse HEAD)/" \
+              ENDCORD_RELEASE_PUBLIC_KEY_FILE="$RUNNER_TEMP/signing/release-key.pub" \
+              node "$RUNNER_TEMP/signing/sign-release.mjs" .
+            git add -A
+            git commit -m "Sign build ${{ github.sha }}"
+          else
+            echo "::warning::No ENDCORD_RELEASE_KEY secret: this build isn't signed, and the installer refuses an unsigned loader"
+          fi
+          git push --force origin builds-next

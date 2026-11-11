@@ -1,0 +1,178 @@
+/*
+ * Ultime Cord, a Discord client mod
+ * Copyright (c) 2025 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { isPluginEnabled } from "@api/PluginManager";
+import { Settings, useSettings } from "@api/Settings";
+import { CodeIcon, FolderPixelIcon, RestartPixelIcon } from "@components/EndcordIcons";
+import { Flex } from "@components/Flex";
+import { PencilIcon, PlusIcon } from "@components/Icons";
+import { Link } from "@components/Link";
+import { Paragraph } from "@components/Paragraph";
+import { QuickAction, QuickActionCard } from "@components/settings/QuickAction";
+import { openPluginModal } from "@components/settings/tabs/plugins/PluginModal";
+import type { UserThemeHeader } from "@main/themes";
+import { classNameFactory } from "@utils/css";
+import { useI18n } from "@utils/i18n";
+import { findLazy } from "@webpack";
+import { Forms, useEffect, useRef, useState } from "@webpack/common";
+import type { ComponentType, Ref, SyntheticEvent } from "react";
+
+import Plugins from "~plugins";
+
+import { ThemeCard } from "./ThemeCard";
+
+const cl = classNameFactory("vc-settings-theme-");
+
+type FileInput = ComponentType<{
+    ref: Ref<HTMLInputElement>;
+    onChange: (e: SyntheticEvent<HTMLInputElement>) => void;
+    multiple?: boolean;
+    filters?: { name?: string; extensions: string[]; }[];
+}>;
+
+const FileInput: FileInput = findLazy(m => m.prototype?.activateUploadDialogue && m.prototype.setRef);
+
+// When a local theme is enabled/disabled, update the settings
+function onLocalThemeChange(fileName: string, value: boolean) {
+    if (value) {
+        if (Settings.enabledThemes.includes(fileName)) return;
+        Settings.enabledThemes = [...Settings.enabledThemes, fileName];
+    } else {
+        Settings.enabledThemes = Settings.enabledThemes.filter(f => f !== fileName);
+    }
+}
+
+async function onFileUpload(e: SyntheticEvent<HTMLInputElement>) {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (!e.currentTarget?.files?.length) return;
+    const { files } = e.currentTarget;
+
+    const uploads = Array.from(files).filter(file => file.name.endsWith(".css")).map(file => {
+        const { name } = file;
+
+        return new Promise<void>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                EndcordNative.themes.uploadTheme(name, reader.result as string)
+                    .then(resolve)
+                    .catch(reject);
+            };
+            reader.readAsText(file);
+        });
+    });
+
+    await Promise.all(uploads);
+}
+
+export function LocalThemesTab() {
+    const { t } = useI18n();
+    const settings = useSettings(["enabledThemes"]);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [userThemes, setUserThemes] = useState<UserThemeHeader[] | null>(null);
+
+    useEffect(() => {
+        refreshLocalThemes();
+    }, []);
+
+    async function refreshLocalThemes() {
+        const themes = await EndcordNative.themes.getThemesList();
+        setUserThemes(themes);
+    }
+
+    return (
+        <Flex flexDirection="column" gap="1.5em">
+            <section>
+                <QuickActionCard>
+                    <>
+                        {IS_WEB ?
+                            (
+                                <QuickAction
+                                    text={
+                                        <span style={{ position: "relative" }}>
+                                            {t("Upload Theme")}
+                                            <FileInput
+                                                ref={fileInputRef}
+                                                onChange={async e => {
+                                                    await onFileUpload(e);
+                                                    refreshLocalThemes();
+                                                }}
+                                                multiple={true}
+                                                filters={[{ extensions: ["css"] }]}
+                                            />
+                                        </span>
+                                    }
+                                    Icon={PlusIcon}
+                                />
+                            ) : (
+                                <QuickAction
+                                    text={t("Open Themes Folder")}
+                                    action={() => EndcordNative.themes.openFolder()}
+                                    Icon={FolderPixelIcon}
+                                />
+                            )}
+                        <QuickAction
+                            text={t("Load missing Themes")}
+                            action={refreshLocalThemes}
+                            Icon={RestartPixelIcon}
+                        />
+                        <QuickAction
+                            text={t("Edit QuickCSS")}
+                            action={() => EndcordNative.quickCss.openEditor()}
+                            Icon={CodeIcon}
+                        />
+
+                        {isPluginEnabled("ClientTheme") && (
+                            <QuickAction
+                                text={t("Edit ClientTheme")}
+                                action={() => openPluginModal(Plugins.ClientTheme)}
+                                Icon={PencilIcon}
+                            />
+                        )}
+                    </>
+                </QuickActionCard>
+
+                {userThemes?.length === 0 && (
+                    <Paragraph className="ec-themes-empty">{t("No themes yet. Add a .css file and it shows up here.")}</Paragraph>
+                )}
+
+                <div className={cl("grid")}>
+                    {userThemes?.map(theme => (
+                        <ThemeCard
+                            key={theme.fileName}
+                            enabled={settings.enabledThemes.includes(theme.fileName)}
+                            onChange={enabled => onLocalThemeChange(theme.fileName, enabled)}
+                            onDelete={async () => {
+                                onLocalThemeChange(theme.fileName, false);
+                                await EndcordNative.themes.deleteTheme(theme.fileName);
+                                refreshLocalThemes();
+                            }}
+                            theme={theme}
+                        />
+                    ))}
+                </div>
+            </section>
+
+            <section>
+                <Forms.FormTitle tag="h5">{t("Find Themes:")}</Forms.FormTitle>
+                <div className="ec-themes-sources">
+                    <Link href="https://betterdiscord.app/themes">{t("BetterDiscord Themes")}</Link>
+                    <Link href="https://github.com/search?q=discord+theme">GitHub</Link>
+                </div>
+                <Forms.FormText>{t("If using the BD site, click on \"Download\" and place the downloaded .theme.css file into your themes folder.")}</Forms.FormText>
+            </section>
+
+            <section>
+                <Forms.FormTitle tag="h5">{t("External Resources")}</Forms.FormTitle>
+                <Forms.FormText>{t("For security reasons, loading resources (styles, fonts, images, ...) from most sites is blocked.")}</Forms.FormText>
+                <Forms.FormText>{t("Make sure all your assets are hosted on GitHub, GitLab, Codeberg, Imgur, Discord or Google Fonts.")}</Forms.FormText>
+            </section>
+        </Flex>
+    );
+}

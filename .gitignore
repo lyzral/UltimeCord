@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds (published as GitHub Releases, not in the repo)
+desktop/dist/
+desktop/dist_compressed/
+desktop/*.exe
+desktop/installer-selftest.log
+mobile/bundle/dist/
+release/
+*.exe
+*.apk
+*.ipa
+
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.keystore
+*.jks
+
+# old preview videos (not Ultime Cord's)
+desktop/previews/
+
+# scratch / editor
+branding/uhq-apo-version.tsx.bak
+branding/gradient-v1/
+.vscode/*.log
+*.log
+.DS_Store
+Thumbs.db
+
+# never publish secrets
+.env
+.env.*
+*.pem
+license.key

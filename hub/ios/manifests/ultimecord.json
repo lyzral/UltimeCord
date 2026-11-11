@@ -1,0 +1,21 @@
+{
+  "name": "Ultime Cord",
+  "layout": "root-flat-no-folders",
+  "bases": [
+    "RainTweak",
+    "Ultime Cord"
+  ],
+  "assets": [
+    "ultimecord-logo.png",
+    "ultimecord-favicon.png"
+  ],
+  "officialPlugins": [
+    "fakeprofile",
+    "notrack",
+    "messagefix",
+    "quickinstall",
+    "ultimecord-enhancements",
+    "badges"
+  ],
+  "notes": "All source files flattened into root using double underscores."
+}
