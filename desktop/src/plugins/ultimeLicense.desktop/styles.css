@@ -325,3 +325,10 @@
     flex-wrap: wrap;
     gap: 8px;
 }
+
+/* Ultime Cord: Discord's "NOUVEAU" pills on the message action bar stick out over the message above */
+[class*="hoverBarButton"] [class*="newBadge"],
+[class*="hoverBarButton"] [class*="textBadge"],
+[class*="buttonsInner"] [class*="newBadge"],
+[class*="buttonsInner"] [class*="textBadge"],
+[class*="buttonsInner"] [class*="badge"]:not([class*="Icon"]) { display: none !important; }

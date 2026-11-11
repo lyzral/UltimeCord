@@ -62,6 +62,15 @@ if (!IS_VANILLA) {
         }
     }
 
+    const OWN_APP_ID = `UltimeCord.${app.getName().replace(/\W/g, "") || "Discord"}`;
+    // Our own taskbar identity: Discord's Squirrel id needs a matching Start menu shortcut for its taskbar picture, and
+    // when that shortcut is missing or stale Windows shows a blank page. With an id of our own, Windows uses the
+    // window's own icon: Discord's
+    if (process.platform === "win32") {
+        app.setAppUserModelId(OWN_APP_ID);
+        app.setAppUserModelId = () => { };
+    }
+
     class BrowserWindow extends electron.BrowserWindow {
         constructor(options: BrowserWindowConstructorOptions) {
             if (!options?.webPreferences?.preload) {
@@ -111,6 +120,25 @@ if (!IS_VANILLA) {
             }
 
             if (!settings.disableBackgroundMemoryTrim) initMemoryTrim(this);
+
+            // Discord points the taskbar button at a relaunch icon in a version folder an update may have removed
+            // (a blank page). Keep our taskbar id and point it at Discord's own app.ico next to Update.exe
+            if (process.platform === "win32") {
+                try {
+                    const { basename, dirname } = require("path");
+                    const root = join(dirname(process.execPath), "..");
+                    const details = {
+                        appId: OWN_APP_ID,
+                        relaunchCommand: `"${join(root, "Update.exe")}" --processStart ${basename(process.execPath)}`,
+                        relaunchDisplayName: app.getName(),
+                        relaunchIconPath: join(root, "app.ico"),
+                        relaunchIconIndex: 0,
+                    };
+                    const setAppDetails = this.setAppDetails.bind(this);
+                    this.setAppDetails = opts => setAppDetails({ ...opts, ...details } as any);
+                    setAppDetails(details as any);
+                } catch { }
+            }
         }
     }
     Object.assign(BrowserWindow, electron.BrowserWindow);

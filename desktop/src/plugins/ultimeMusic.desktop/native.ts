@@ -25,6 +25,7 @@ function Await($op, [Type]$t) { $task = $asTask.MakeGenericMethod($t).Invoke($nu
 [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime] | Out-Null
 [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties, Windows.Media.Control, ContentType = WindowsRuntime] | Out-Null
 [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
+[Windows.Storage.Streams.IRandomAccessStream, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
 [Windows.Storage.Streams.DataReader, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
 $mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
 $lastKey = ''; $art = ''
@@ -52,11 +53,19 @@ while ($true) {
         $lastKey = $key; $art = ''
         if ($p.Thumbnail) {
             $st = Await ($p.Thumbnail.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
-            if ($st -and $st.Size -gt 0 -and $st.Size -lt 3000000) {
-                $dr = New-Object Windows.Storage.Streams.DataReader($st.GetInputStreamAt(0))
-                $n = Await ($dr.LoadAsync([uint32]$st.Size)) ([uint32])
-                $bytes = New-Object byte[] $n; $dr.ReadBytes($bytes)
-                $art = "data:$($st.ContentType);base64," + [Convert]::ToBase64String($bytes)
+            if ($st) {
+                $dr = [Windows.Storage.Streams.DataReader]::new($st)
+                $dr.InputStreamOptions = [Windows.Storage.Streams.InputStreamOptions]::Partial
+                $ms = New-Object System.IO.MemoryStream
+                while ($ms.Length -lt 4000000) {
+                    $n = Await ($dr.LoadAsync(65536)) ([uint32])
+                    if (-not $n) { break }
+                    $chunk = New-Object byte[] $n; $dr.ReadBytes($chunk); $ms.Write($chunk, 0, $n)
+                }
+                if ($ms.Length -gt 0 -and $ms.Length -lt 4000000) {
+                    $ct = if ($st.ContentType) { $st.ContentType } else { 'image/png' }
+                    $art = "data:$ct;base64," + [Convert]::ToBase64String($ms.ToArray())
+                }
             }
         }
         $artOut = $art

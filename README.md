@@ -68,7 +68,7 @@ par PC
 
 **`desktop/`**
 <br><br>
-Le client PC et navigateur : plugins, thèmes, éditeur CSS, mode audio UHQ et l'installeur `ultimecord.exe`.
+Le client PC et navigateur : plugins, thèmes, éditeur CSS et l'installeur `ultimecord.exe`.
 
 </td>
 <td width="33%" valign="top">
@@ -96,20 +96,11 @@ Bundles prêts à l'emploi et plugins officiels pour desktop, Android et iOS.
 <tr>
 <td width="50%" valign="top">
 
-**UHQ — mode audio**
-<br>
-Un bouton en haut de Discord transforme toute l'appli en studio audio : bitrate jusqu'à 510 kbps, stéréo, volumes, Krisp, anti-écho, volume et pan par membre, et des effets sur ta voix (EQ paramétrique, filtres, gain, pan).
-
-</td>
-<td width="50%" valign="top">
-
 **Glass Fluid**
 <br>
 Une case dans le Studio de thèmes : verre, fond fluide animé, onglets en pilules et coins arrondis par-dessus n'importe quel thème.
 
 </td>
-</tr>
-<tr>
 <td width="50%" valign="top">
 
 **Ultime Script**
@@ -117,6 +108,8 @@ Une case dans le Studio de thèmes : verre, fond fluide animé, onglets en pilul
 Un décor pixel animé (enfer, paradis…) ou un panneau en verre, avec des outils pour ton propre compte.
 
 </td>
+</tr>
+<tr>
 <td width="50%" valign="top">
 
 **Licences**
