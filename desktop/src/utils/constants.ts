@@ -64,6 +64,12 @@ export const DevsById = /* #__PURE__*/ (() =>
 
 export const EndcordDevs = Devs;
 
+/**
+ * Authors of plugins Ultime Cord carries from other Vencord forks (Equicord, Nightcord...). Their GPL asks that the
+ * credit travels with the code, so every name a plugin asks for resolves instead of being dropped.
+ */
+export const EquicordDevs = Devs;
+
 
 
 export const GUILD_IDS = [ENDCORD_GUILD_ID];

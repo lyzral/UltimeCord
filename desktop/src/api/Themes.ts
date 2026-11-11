@@ -80,6 +80,18 @@ async function initThemes() {
     }
     themesStyle.textContent = links.map(link => `@import url("${link.trim()}");`).join("\n");
     updatePopoutWindows();
+    themeChangeListeners.forEach(listener => listener());
+}
+
+const themeChangeListeners = new Set<() => void>();
+
+/** Called every time the enabled themes change, for plugins that have to redraw with them */
+export function addThemeChangeListener(listener: () => void) {
+    themeChangeListeners.add(listener);
+}
+
+export function removeThemeChangeListener(listener: () => void) {
+    themeChangeListeners.delete(listener);
 }
 
 function applyToPopout(popoutWindow: Window | undefined, key: string) {
