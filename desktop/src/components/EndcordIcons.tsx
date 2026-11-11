@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { PANDA_PALETTE, PANDA_ROWS, PixelArt, SLEEPING_PANDA_ROWS } from "@components/settings/SpecialCard";
+import { PixelArt } from "@components/settings/SpecialCard";
 import { classes } from "@utils/misc";
 import type { IconProps } from "@utils/types";
 import type { ReactNode } from "react";
@@ -361,9 +361,14 @@ export const CornerIcon = pixelIcon([
     </>
 ));
 
-/** Endcord's panda. It sleeps on the logo, and wakes up when someone's there */
+/** Ultime Cord's mark: a U holding a spark, which dims when nobody's there */
 export function EndcordMark({ width = 17, className, asleep }: IconProps & { asleep?: boolean; }) {
-    return <PixelArt className={className} rows={asleep ? SLEEPING_PANDA_ROWS : PANDA_ROWS} palette={PANDA_PALETTE} pixel={Math.max(1, Math.floor(Number(width) / 17))} />;
+    return (
+        <svg className={className} width={width} height={width} viewBox="150 130 724 724" aria-hidden="true">
+            <path d="M318 300V560a194 194 0 0 0 388 0V300" fill="none" stroke="#C4B5FD" strokeWidth="124" strokeLinecap="round" />
+            <path d="M512 212C524 300 552 328 640 340C552 352 524 380 512 468C500 380 472 352 384 340C472 328 500 300 512 212Z" fill="#F5EEFF" opacity={asleep ? 0.35 : 1} />
+        </svg>
+    );
 }
 
 const LETTERS: Record<string, string[]> = {

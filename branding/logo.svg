@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs>
+<linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b1a8f"/><stop offset=".55" stop-color="#1d0d4a"/><stop offset="1" stop-color="#0d0620"/></linearGradient>
+<radialGradient id="halo" cx="50%" cy="34%" r="52%"><stop offset="0" stop-color="#a472ff" stop-opacity=".55"/><stop offset="1" stop-color="#a472ff" stop-opacity="0"/></radialGradient>
+<linearGradient id="u" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#b9a0ff"/></linearGradient>
+<linearGradient id="spark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9ff"/><stop offset="1" stop-color="#c79bff"/></linearGradient>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1024" height="1024" rx="228" fill="url(#tile)"/>
+<rect width="1024" height="1024" rx="228" fill="url(#halo)"/>
+<rect x="5" y="5" width="1014" height="1014" rx="223" fill="none" stroke="#c9b4ff" stroke-opacity=".22" stroke-width="10"/>
+<g transform="translate(0 28)"><path d="M318 300V560a194 194 0 0 0 388 0V300" fill="none" stroke="url(#u)" stroke-width="124" stroke-linecap="round"/>
+<path d="M512 212C524 300 552 328 640 340C552 352 524 380 512 468C500 380 472 352 384 340C472 328 500 300 512 212Z" fill="url(#spark)" filter="url(#glow)"/></g>
+</svg>
