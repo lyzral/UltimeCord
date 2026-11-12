@@ -5,7 +5,7 @@ B = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(B, "readme")
 os.makedirs(OUT, exist_ok=True)
 
-PLUGINS = "750+"
+PLUGINS = "560+"
 SANS = "'Segoe UI', -apple-system, Helvetica, Arial, sans-serif"
 BLACK = "'Segoe UI Black', 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif"
 

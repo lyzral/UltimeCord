@@ -20,7 +20,7 @@
 ## Ce qu'il y a dedans
 
 <p align="center">
-  <img src="branding/readme/f-plugins.svg" width="32.5%" alt="Plus de 750 plugins : discussion, vocal, confidentialité, apparence. Recherche, filtre par tag, activation en un clic." />
+  <img src="branding/readme/f-plugins.svg" width="32.5%" alt="Plus de 560 plugins : discussion, vocal, confidentialité, apparence. Recherche, filtre par tag, activation en un clic." />
   <img src="branding/readme/f-themes.svg" width="32.5%" alt="Studio de thèmes : crée un thème en direct, ou ajoute Glass Fluid, des panneaux en verre par-dessus n'importe quel thème." />
   <img src="branding/readme/f-widget.svg" width="32.5%" alt="Custom Widget : un studio pour ton propre widget de profil, par l'API officielle de Discord." />
 </p>

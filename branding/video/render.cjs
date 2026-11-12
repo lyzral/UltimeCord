@@ -11,7 +11,7 @@ const FPS = +fpsArg;
     const browser = await puppeteer.launch({ executablePath: exe, headless: true, args: ["--no-sandbox", "--hide-scrollbars", "--force-device-scale-factor=1"] });
     const page = await browser.newPage();
     await page.setViewport({ width: 1920, height: 1080 });
-    await page.goto("file:///" + path.join(__dirname, "promo.html").replace(/\\/g, "/"));
+    await page.goto("file:///" + path.join(__dirname, "promo.html").replace(/\\/g, "/"), { waitUntil: "load" });
     const duration = await page.evaluate("DURATION");
     fs.mkdirSync(out, { recursive: true });
 
