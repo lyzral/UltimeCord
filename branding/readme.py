@@ -92,7 +92,6 @@ card("f-themes.svg", "brush", "#fbfbfb", "Theme studio", "Build a theme live, or
 card("f-widget.svg", "widget", "#eeeeee", "Custom Widget", "A studio for your own profile widget,", "through Discord's official widget API.")
 card("f-music.svg", "music", "#f6f6f6", "Music player", "What plays on your PC, one button away", "in Discord's top bar.")
 card("f-quest.svg", "quest", "#ffffff", "AutoQuest &amp; VRMod", "Finish your quests in the background,", "show up as on a VR headset.")
-card("f-key.svg", "key", "#ebebeb", "One key per PC", "Every licence is signed, tied to a PC", "and can be revoked.")
 
 
 # ---------- buttons ----------

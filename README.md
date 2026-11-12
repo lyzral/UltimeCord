@@ -27,16 +27,14 @@
 <p align="center">
   <img src="branding/readme/f-music.svg" width="32.5%" alt="Lecteur musique : ce qui joue sur ton PC, à un bouton dans la barre du haut de Discord." />
   <img src="branding/readme/f-quest.svg" width="32.5%" alt="AutoQuest et VRMod : termine tes quêtes en arrière-plan, apparais comme connecté depuis un casque VR." />
-  <img src="branding/readme/f-key.svg" width="32.5%" alt="Une clé par PC : chaque licence est signée, liée à un PC et révocable." />
 </p>
 
 ## Installer
 
 **Windows**
 
-1. Télécharge [`ultimecord.exe`](https://github.com/lyzral/UltimeCord/releases/latest/download/ultimecord.exe) et lance-le : il affiche ton **code PC**.
-2. Envoie ce code sur le [Discord](https://discord.gg/khad) pour recevoir ta clé.
-3. Colle la clé, choisis tes Discord, installe.
+1. Télécharge [`ultimecord.exe`](https://github.com/lyzral/UltimeCord/releases/latest/download/ultimecord.exe) et lance-le.
+2. Choisis tes Discord (Stable, PTB, Canary), installe.
 
 **Linux et macOS** — décompresse [`ultimecord-linux.tar.gz`](https://github.com/lyzral/UltimeCord/releases/latest/download/ultimecord-linux.tar.gz), puis :
 
@@ -44,7 +42,7 @@
 sh install.sh --install
 ```
 
-Le script affiche ton code PC et demande la clé. Il lui faut `python3` et `openssl`.
+Il lui faut `python3` et `openssl` (pour vérifier la signature de la version).
 
 **Android** — installe l'[APK](https://github.com/lyzral/UltimeCord/releases/latest/download/ultimecord-android.apk). C'est une version de test : le module mobile n'est pas encore publié, l'appli s'installe mais n'a pas encore de module à télécharger.
 

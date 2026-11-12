@@ -53,14 +53,6 @@ namespace EndcordInstaller
 
             var app = new System.Windows.Application { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
 
-            // Ultime Cord needs a license key before anything is installed (kept once valid, asked again if it expires)
-            if (!EndcordInstaller.Core.License.HasValidSaved())
-            {
-                var lw = new LicenseWindow();
-                bool? ok = lw.ShowDialog();
-                if (ok != true) return 0;
-            }
-
             app.ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;
             app.Run(new InstallerWindow());
             return 0;
