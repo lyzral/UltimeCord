@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="148" viewBox="0 0 400 148">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#191428"/><stop offset="1" stop-color="#110e1b"/></linearGradient>
+<radialGradient id="cg" cx="0%" cy="0%" r="80%"><stop offset="0" stop-color="#5eead4" stop-opacity=".2"/><stop offset="1" stop-color="#5eead4" stop-opacity="0"/></radialGradient></defs>
+<rect x=".5" y=".5" width="399" height="147" rx="15.5" fill="url(#bg)" stroke="#5eead4" stroke-opacity=".3"/>
+<rect x=".5" y=".5" width="399" height="147" rx="15.5" fill="url(#cg)"/>
+<rect x="24" y="24" width="42" height="42" rx="11" fill="#5eead4" fill-opacity=".16" stroke="#5eead4" stroke-opacity=".45"/>
+<g transform="translate(33 33)" fill="none" stroke="#5eead4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="11" width="8" height="10" rx="2"/><rect x="3" y="14" width="8" height="7" rx="2"/></g>
+<text x="80" y="52" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="19" font-weight="700" fill="#fff">Custom Widget</text>
+<text x="24" y="98" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="14" fill="#c9bfe4">A studio for your own profile widget,</text>
+<text x="24" y="119" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" font-size="14" fill="#c9bfe4">through Discord's official widget API.</text>
+</svg>

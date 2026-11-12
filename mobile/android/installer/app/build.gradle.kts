@@ -54,9 +54,9 @@ android {
             .orElse(providers.fileContents(rootProject.layout.projectDirectory.file("../../bundle/release-key.pub")).asText)
             .get().trim()
         buildConfigField("String", "RELEASE_KEY", "\"$releaseKey\"")
-        buildConfigField("int", "MODDED_APP_ICON", "0xFF10182A") // Endcord night blue
-        buildConfigField("int", "MODDED_APP_ICON_ALPHA", "0xFF3D74E0") // cobalt (beta)
-        buildConfigField("int", "MODDED_APP_ICON_OTHER", "0xFF9CCBFF") // ice (alpha)
+        buildConfigField("int", "MODDED_APP_ICON", "0xFF1D0D4A") // Ultime Cord deep violet
+        buildConfigField("int", "MODDED_APP_ICON_ALPHA", "0xFF7C4DFF") // violet (beta)
+        buildConfigField("int", "MODDED_APP_ICON_OTHER", "0xFFC9B4FF") // lavender (alpha)
 
         buildConfigField("String", "GIT_BRANCH", "\"${getCurrentBranch()}\"")
         buildConfigField("String", "GIT_COMMIT", "\"${getLatestCommit()}\"")
